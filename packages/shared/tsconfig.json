@@ -7,8 +7,8 @@
     "rootDir": "src",
     "strict": true,
     "declaration": true,
-    "declarationMap": true,
-    "composite": true,
+    "declarationMap": false,
+    "incremental": false,
     "emitDeclarationOnly": false,
     "skipLibCheck": true
   },
