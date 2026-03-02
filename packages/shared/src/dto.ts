@@ -1,8 +1,18 @@
 import type { CompatibilityReason, HistoryStatus, PrinterState } from './enums.js';
 
 export type PrinterSnapshotDto = {
-  snapshotUrl: string | null;
-  snapshotUpdatedAt: string | null;
+  state: PrinterState;
+  filename: string | null;
+  progress: number | null;
+  etaSec: number | null;
+  temps: {
+    extruder: number | null;
+    bed: number | null;
+  };
+  layers: {
+    current: number | null;
+    total: number | null;
+  };
 };
 
 export type PrinterDto = {
@@ -13,8 +23,15 @@ export type PrinterDto = {
   bedY: number;
   bedZ: number;
   nozzleDiameter: number;
-  state: PrinterState;
-} & PrinterSnapshotDto;
+  snapshot: PrinterSnapshotDto;
+};
+
+export type PresetCompatibilityRulesDto = {
+  allowedModelIds: string[];
+  allowedNozzleDiameters: number[];
+  minBedX: number;
+  minBedY: number;
+};
 
 export type PresetCompatibilityDto = {
   printerId: string;
@@ -24,10 +41,16 @@ export type PresetCompatibilityDto = {
 
 export type PresetDto = {
   id: string;
-  name: string;
+  title: string;
+  plasticType: string;
+  colorHex: string;
   description: string | null;
   thumbnailUrl: string | null;
-  compatibility: PresetCompatibilityDto[];
+  compatibilityRules: PresetCompatibilityRulesDto;
+};
+
+export type PrintPresetBodyDto = {
+  printerIds: string[];
 };
 
 export type PrintHistoryDto = {

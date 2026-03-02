@@ -3,6 +3,10 @@ node_modules
 .env
 .env.*
 !.env.example
+.ngrok_tmp
+.deploy/*.env
+ssh_exec.py
+scp_exec.py
 apps/backend/prisma/dev.db
 apps/backend/data
 apps/backend/dist

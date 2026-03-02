@@ -1,0 +1,147 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          String   @id @default(cuid())
+  telegramId  String   @unique
+  chatId      String?
+  isAllowed   Boolean  @default(false)
+
+  muteFirstLayerDone Boolean @default(false)
+  mutePrintComplete  Boolean @default(false)
+  mutePrintError     Boolean @default(false)
+
+  firstName String?
+  lastName  String?
+  username  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model PrinterModel {
+  id          String   @id @default(cuid())
+  title       String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  printers    Printer[]
+  allowedBy   PresetAllowedModel[]
+}
+
+model Printer {
+  id              String   @id @default(cuid())
+  displayName     String
+
+  baseUrl         String
+  apiKeyEncrypted String
+
+  bedX            Float
+  bedY            Float
+  bedZ            Float
+  nozzleDiameter  Float
+
+  modelId         String
+  model           PrinterModel @relation(fields: [modelId], references: [id], onDelete: Restrict)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  deployments     PresetDeployment[]
+  history         PrintHistory[]
+  notifications   NotificationLog[]
+
+  @@unique([baseUrl])
+}
+
+model Preset {
+  id            String   @id @default(cuid())
+  title         String
+  plasticType   String
+  colorHex      String
+  description   String?
+
+  gcodePath     String
+  thumbnailPath String?
+  gcodeMeta     Json?
+
+  allowedNozzleDiameters Json
+  minBedX       Float
+  minBedY       Float
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  allowedModels PresetAllowedModel[]
+  deployments   PresetDeployment[]
+}
+
+model PresetAllowedModel {
+  id       String @id @default(cuid())
+  presetId String
+  modelId  String
+
+  preset   Preset       @relation(fields: [presetId], references: [id], onDelete: Cascade)
+  model    PrinterModel @relation(fields: [modelId], references: [id], onDelete: Cascade)
+
+  @@unique([presetId, modelId])
+}
+
+model PresetDeployment {
+  id             String   @id @default(cuid())
+  presetId       String
+  printerId      String
+
+  remoteFilename String
+  checksum       String
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  preset         Preset  @relation(fields: [presetId], references: [id], onDelete: Cascade)
+  printer        Printer @relation(fields: [printerId], references: [id], onDelete: Cascade)
+
+  @@unique([presetId, printerId])
+}
+
+model PrintHistory {
+  id               String   @id @default(cuid())
+  printerId        String
+
+  printSessionId   String?
+  filename         String
+  status           String
+
+  startedAt        DateTime
+  endedAt          DateTime?
+  printDurationSec Int?
+  totalDurationSec Int?
+  filamentUsedMm   Float?
+  errorMessage     String?
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  printer          Printer  @relation(fields: [printerId], references: [id], onDelete: Cascade)
+
+  @@index([printerId])
+}
+
+model NotificationLog {
+  id             String   @id @default(cuid())
+  printerId      String
+  printSessionId String
+  eventType      String
+
+  createdAt      DateTime @default(now())
+
+  printer        Printer  @relation(fields: [printerId], references: [id], onDelete: Cascade)
+
+  @@unique([printerId, printSessionId, eventType])
+}

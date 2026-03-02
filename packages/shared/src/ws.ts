@@ -2,8 +2,6 @@ import type { PrinterDto, PrintHistoryDto } from './dto.js';
 
 export type WsPrinterStatusPayload = {
   printer: PrinterDto;
-  progress: number | null;
-  etaSec: number | null;
 };
 
 export type WsHistoryEventPayload = {

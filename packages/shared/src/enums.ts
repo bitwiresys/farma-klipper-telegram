@@ -19,11 +19,13 @@ export enum NotificationEventType {
   PRINT_ERROR = 'PRINT_ERROR',
 }
 
-export enum CompatibilityReason {
-  MODEL_NOT_ALLOWED = 'MODEL_NOT_ALLOWED',
-  NOZZLE_NOT_ALLOWED = 'NOZZLE_NOT_ALLOWED',
-  BED_TOO_SMALL = 'BED_TOO_SMALL',
-  PRINTER_NOT_READY = 'PRINTER_NOT_READY',
-  PRINTER_BUSY = 'PRINTER_BUSY',
-  OFFLINE = 'OFFLINE',
-}
+export const COMPATIBILITY_REASONS = [
+  'MODEL_NOT_ALLOWED',
+  'NOZZLE_NOT_ALLOWED',
+  'BED_TOO_SMALL',
+  'PRINTER_BUSY',
+  'PRINTER_NOT_READY',
+  'OFFLINE',
+] as const;
+
+export type CompatibilityReason = (typeof COMPATIBILITY_REASONS)[number];
