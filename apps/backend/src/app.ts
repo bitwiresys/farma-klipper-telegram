@@ -4,10 +4,10 @@ import rateLimit from '@fastify/rate-limit';
 import websocket from '@fastify/websocket';
 
 import { env } from './env.js';
-import { logger } from './logger.js';
+import { loggerOptions } from './logger.js';
 
 export async function buildApp() {
-  const app = Fastify({ logger });
+  const app = Fastify({ logger: loggerOptions });
 
   await app.register(cors, {
     origin: env.CORS_ORIGIN,
