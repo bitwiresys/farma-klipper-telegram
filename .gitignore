@@ -1,0 +1,13 @@
+node_modules
+.DS_Store
+.env
+.env.*
+!.env.example
+apps/backend/prisma/dev.db
+apps/backend/data
+apps/backend/dist
+apps/backend/node_modules
+apps/frontend/.next
+apps/frontend/node_modules
+packages/shared/dist
+packages/shared/node_modules

@@ -1,0 +1,10 @@
+node_modules
+**/dist
+**/.next
+**/.turbo
+**/.vercel
+**/coverage
+**/*.log
+pnpm-lock.yaml
+apps/backend/prisma/dev.db
+apps/backend/data

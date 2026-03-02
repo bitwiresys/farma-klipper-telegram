@@ -1,0 +1,22 @@
+{
+  "name": "farma",
+  "private": true,
+  "packageManager": "pnpm@9.15.6",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "format": "prettier -w .",
+    "lint": "eslint .",
+    "typecheck": "pnpm -r typecheck",
+    "dev": "pnpm -r dev",
+    "build": "pnpm -r build"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.19.0",
+    "eslint": "^9.19.0",
+    "prettier": "^3.4.2",
+    "typescript": "^5.7.3"
+  }
+}
