@@ -24,6 +24,7 @@ export function registerAuthMiddleware(app: FastifyInstance) {
 
     if (url === '/api/health') return;
     if (url === '/api/auth/telegram') return;
+    if (url.startsWith('/api/ws')) return;
 
     const authHeader = req.headers.authorization;
     if (!authHeader) return unauthorized(reply, 'Missing Authorization header');
