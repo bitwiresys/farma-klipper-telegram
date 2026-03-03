@@ -7,10 +7,7 @@ import { MoonrakerHttp } from '../moonraker_http.js';
 
 async function main() {
   const baseUrl = process.env.MOONRAKER_BASE_URL_BOOTSTRAP ?? 'http://192.168.0.45:7125';
-  const apiKey = process.env.MOONRAKER_API_KEY_BOOTSTRAP;
-  if (!apiKey) {
-    throw new Error('MOONRAKER_API_KEY_BOOTSTRAP is required');
-  }
+  const apiKey = process.env.MOONRAKER_API_KEY_BOOTSTRAP ?? '';
 
   const existingModel = await prisma.printerModel.findFirst({ where: { name: 'Test Model' } });
   const model =

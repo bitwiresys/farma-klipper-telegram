@@ -127,10 +127,13 @@ export class MoonrakerWsConnector {
 
     this.connectionId = null;
 
+    const headers: Record<string, string> = {};
+    if (this.opts.apiKey.trim()) {
+      headers['X-Api-Key'] = this.opts.apiKey;
+    }
+
     const ws = new WebSocket(wsUrl, {
-      headers: {
-        'X-Api-Key': this.opts.apiKey,
-      },
+      headers,
       handshakeTimeout: 8000,
     });
 

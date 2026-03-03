@@ -41,10 +41,13 @@ export class MoonrakerHttp {
   }
 
   private headers(): HeadersInit {
-    return {
+    const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      'X-Api-Key': this.apiKey,
     };
+    if (this.apiKey.trim()) {
+      headers['X-Api-Key'] = this.apiKey;
+    }
+    return headers;
   }
 
   async get<T>(path: string, init?: MoonrakerRequestInit): Promise<T> {
