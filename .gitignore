@@ -7,7 +7,7 @@ node_modules
 .deploy/*.env
 ssh_exec.py
 scp_exec.py
-apps/backend/prisma/dev.db
+apps/backend/prisma/*.db
 apps/backend/data
 apps/backend/dist
 apps/backend/node_modules
