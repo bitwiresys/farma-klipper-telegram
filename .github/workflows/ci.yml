@@ -23,4 +23,6 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Run checks
+        env:
+          DATABASE_URL: file:./prisma/dev.db
         run: pnpm check
