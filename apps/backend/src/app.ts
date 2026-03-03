@@ -9,6 +9,10 @@ import { registerAuthMiddleware } from './auth.js';
 import { registerErrorHandling } from './errors.js';
 import { registerAuthRoutes } from './routes_auth.js';
 import { registerMeRoutes } from './routes_me.js';
+import { registerPrinterModelsRoutes } from './routes_printer_models.js';
+import { registerPrintersRoutes } from './routes_printers.js';
+import { registerSnapshotRoutes } from './routes_snapshot.js';
+import { registerWsHub } from './ws_hub.js';
 
 export async function buildApp() {
   const app = Fastify({ logger: loggerOptions });
@@ -34,6 +38,11 @@ export async function buildApp() {
 
   registerAuthMiddleware(app);
   await registerMeRoutes(app);
+
+  await registerPrinterModelsRoutes(app);
+  await registerPrintersRoutes(app);
+  await registerSnapshotRoutes(app);
+  await registerWsHub(app);
 
   return app;
 }
