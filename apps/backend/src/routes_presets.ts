@@ -12,6 +12,9 @@ import { Prisma } from '@prisma/client';
 import { env } from './env.js';
 import { prisma } from './prisma.js';
 import { wsHub } from './ws_hub.js';
+import { MoonrakerHttp } from './moonraker_http.js';
+import { printerRuntime } from './printer_runtime.js';
+import { decryptApiKey } from './crypto_api_key.js';
 
 function ensureDir(p: string) {
   fs.mkdirSync(p, { recursive: true });
@@ -53,6 +56,26 @@ function resolveFilesDirSafe(relPath: string): string {
     throw new Error('INVALID_PATH');
   }
   return abs;
+}
+
+function sha256Hex(buf: Buffer): string {
+  return crypto.createHash('sha256').update(buf).digest('hex');
+}
+
+function runWithConcurrency<T>(
+  limit: number,
+  items: T[],
+  fn: (item: T) => Promise<void>,
+): Promise<void> {
+  let idx = 0;
+  const workers = Array.from({ length: Math.max(1, limit) }, async () => {
+    for (;;) {
+      const i = idx++;
+      if (i >= items.length) return;
+      await fn(items[i]);
+    }
+  });
+  return Promise.all(workers).then(() => undefined);
 }
 
 export async function registerPresetsRoutes(app: FastifyInstance) {
@@ -212,6 +235,128 @@ export async function registerPresetsRoutes(app: FastifyInstance) {
     });
 
     return reply.code(201).send({ preset: presetToDto(created) });
+  });
+
+  app.post('/api/presets/:id/print', async (req, reply) => {
+    const presetId = (req.params as any).id as string;
+    const body = (req.body ?? {}) as any;
+    const printerIds = Array.isArray(body.printerIds)
+      ? (body.printerIds as unknown[]).filter((x) => typeof x === 'string')
+      : [];
+
+    if (printerIds.length === 0) {
+      return reply
+        .code(400)
+        .send({ error: 'BAD_REQUEST', message: 'printerIds required' });
+    }
+
+    const preset = await prisma.preset.findUnique({
+      where: { id: presetId },
+      include: { compatibilityRules: true, allowedModels: true },
+    });
+    if (!preset) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+    const rules = (preset as any).compatibilityRules as
+      | {
+          minBedX: number;
+          minBedY: number;
+          allowedNozzleDiameters: unknown;
+        }
+      | null
+      | undefined;
+
+    const allowedModelIds = new Set(
+      ((preset as any).allowedModels ?? []).map((x: any) => x.modelId),
+    );
+    const allowedNozzles = Array.isArray(rules?.allowedNozzleDiameters)
+      ? (rules?.allowedNozzleDiameters as unknown[])
+          .map((x) => (typeof x === 'number' ? x : null))
+          .filter((x): x is number => x !== null)
+      : [];
+
+    const printers = await prisma.printer.findMany({
+      where: { id: { in: printerIds } },
+      include: { model: true },
+    });
+
+    const reasons: Array<{ printerId: string; reasons: string[] }> = [];
+    const printable: typeof printers = [];
+
+    for (const p of printers) {
+      const r: string[] = [];
+      if (allowedModelIds.size > 0 && !allowedModelIds.has(p.modelId)) {
+        r.push('MODEL_NOT_ALLOWED');
+      }
+      if (rules) {
+        if (p.bedX < rules.minBedX || p.bedY < rules.minBedY) {
+          r.push('BED_TOO_SMALL');
+        }
+        if (
+          allowedNozzles.length > 0 &&
+          !allowedNozzles.includes(p.nozzleDiameter)
+        ) {
+          r.push('NOZZLE_NOT_ALLOWED');
+        }
+      }
+
+      const snap = (printerRuntime.getSnapshot(p.id) ?? null) as any;
+      const state = String(snap?.state ?? '');
+      if (state === 'printing' || state === 'paused') {
+        r.push('PRINTER_BUSY');
+      }
+
+      if (r.length > 0) {
+        reasons.push({ printerId: p.id, reasons: r });
+      } else {
+        printable.push(p);
+      }
+    }
+
+    if (reasons.length > 0) {
+      return reply.code(409).send({ error: 'BLOCKED', reasons });
+    }
+
+    const abs = resolveFilesDirSafe(preset.gcodePath);
+    const gcodeBuf = fs.readFileSync(abs);
+    const checksum = sha256Hex(gcodeBuf);
+    const remoteDir = path.posix.join('tg_presets', presetId);
+    const remoteFilename = path.posix.join(remoteDir, `${checksum}.gcode`);
+
+    await runWithConcurrency(2, printable, async (p) => {
+      const printer = await prisma.printer.findUnique({ where: { id: p.id } });
+      if (!printer) throw new Error('Printer not found');
+
+      const apiKey = decryptApiKey(
+        printer.apiKeyEncrypted,
+        env.PRINTER_API_KEY_ENC_KEY,
+      );
+
+      const http = new MoonrakerHttp({
+        baseUrl: printer.baseUrl,
+        apiKey,
+      });
+
+      await http.uploadFile({
+        filename: path.posix.basename(remoteFilename),
+        data: gcodeBuf,
+        path: remoteDir,
+        root: 'gcodes',
+        checksumSha256: checksum,
+      });
+
+      await http.post(
+        `/server/files/metascan?filename=${encodeURIComponent(remoteFilename)}`,
+      );
+      await http.get(
+        `/server/files/metadata?filename=${encodeURIComponent(remoteFilename)}`,
+      );
+      await http.get(
+        `/server/files/thumbnails?filename=${encodeURIComponent(remoteFilename)}`,
+      );
+      await http.post('/printer/print/start', { filename: remoteFilename });
+    });
+
+    return reply.send({ ok: true, remoteFilename });
   });
 
   app.patch('/api/presets/:id', async (req, reply) => {

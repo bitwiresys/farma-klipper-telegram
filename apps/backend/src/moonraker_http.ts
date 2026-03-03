@@ -10,6 +10,14 @@ export type MoonrakerRequestInit = {
   timeoutMs?: number;
 };
 
+export type MoonrakerUploadOptions = {
+  filename: string;
+  data: Buffer;
+  path?: string;
+  root?: 'gcodes' | 'config';
+  checksumSha256?: string;
+};
+
 function normalizeBaseUrl(raw: string): string {
   const url = raw.trim().replace(/\/+$/, '');
   return url;
@@ -56,6 +64,12 @@ export class MoonrakerHttp {
     };
   }
 
+  private headersAuthOnly(): HeadersInit {
+    return {
+      'X-Api-Key': this.apiKey,
+    };
+  }
+
   async get<T>(path: string, init?: MoonrakerRequestInit): Promise<T> {
     const url = `${this.baseUrl}${path}`;
     logger.debug({ url }, 'moonraker http get');
@@ -97,6 +111,36 @@ export class MoonrakerHttp {
         objects: Object.fromEntries(objects.map((o) => [o, null])),
       },
       init,
+    );
+  }
+
+  async uploadFile<T = any>(
+    opts: MoonrakerUploadOptions,
+    init?: MoonrakerRequestInit,
+  ): Promise<T> {
+    const url = `${this.baseUrl}/server/files/upload`;
+    logger.debug({ url }, 'moonraker http upload');
+
+    const form = new FormData();
+
+    // Moonraker expects field name: file
+    const blob = new Blob([new Uint8Array(opts.data)], {
+      type: 'application/octet-stream',
+    });
+    form.append('file', blob, opts.filename);
+
+    if (opts.root) form.append('root', opts.root);
+    if (opts.path) form.append('path', opts.path);
+    if (opts.checksumSha256) form.append('checksum', opts.checksumSha256);
+
+    return fetchJson<T>(
+      url,
+      {
+        method: 'POST',
+        headers: this.headersAuthOnly(),
+        body: form as any,
+      },
+      init?.timeoutMs ?? 30_000,
     );
   }
 }

@@ -27,6 +27,16 @@ function isProtectedApiRoute(method: string, pathname: string): boolean {
   if (m === 'POST' && pathname === '/api/printer-models') return true;
   if (m === 'GET' && pathname === '/api/history') return true;
 
+  if (m === 'GET' && pathname === '/api/presets') return true;
+  if (m === 'POST' && pathname === '/api/presets') return true;
+  if (m === 'GET' && /^\/api\/presets\/[^/]+$/.test(pathname)) return true;
+  if (m === 'PATCH' && /^\/api\/presets\/[^/]+$/.test(pathname)) return true;
+  if (m === 'DELETE' && /^\/api\/presets\/[^/]+$/.test(pathname)) return true;
+  if (m === 'GET' && /^\/api\/presets\/[^/]+\/thumbnail$/.test(pathname))
+    return true;
+  if (m === 'POST' && /^\/api\/presets\/[^/]+\/print$/.test(pathname))
+    return true;
+
   if (m === 'PATCH' && /^\/api\/printers\/[^/]+$/.test(pathname)) return true;
   if (m === 'DELETE' && /^\/api\/printers\/[^/]+$/.test(pathname)) return true;
   if (m === 'POST' && /^\/api\/printers\/[^/]+\/(test|rescan)$/.test(pathname))
