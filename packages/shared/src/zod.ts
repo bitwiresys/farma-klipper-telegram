@@ -84,6 +84,7 @@ export const PrinterDtoSchema = z
     bedY: z.number(),
     bedZ: z.number(),
     nozzleDiameter: z.number(),
+    needsRekey: z.boolean(),
     snapshot: PrinterSnapshotSchema,
   })
   .strict();

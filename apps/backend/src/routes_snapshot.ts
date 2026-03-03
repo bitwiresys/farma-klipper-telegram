@@ -24,6 +24,7 @@ export async function registerSnapshotRoutes(app: FastifyInstance) {
         bedY: p.bedY,
         bedZ: p.bedZ,
         nozzleDiameter: p.nozzleDiameter,
+        needsRekey: p.needsRekey,
         snapshot: snap,
       };
     });

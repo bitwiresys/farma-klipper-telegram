@@ -42,6 +42,8 @@ model Printer {
   baseUrl         String
   apiKeyEncrypted String
 
+  needsRekey      Boolean  @default(false)
+
   bedX            Float
   bedY            Float
   bedZ            Float

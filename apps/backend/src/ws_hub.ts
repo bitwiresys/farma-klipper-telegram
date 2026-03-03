@@ -86,6 +86,7 @@ export class WsHub {
             bedY: p.bedY,
             bedZ: p.bedZ,
             nozzleDiameter: p.nozzleDiameter,
+            needsRekey: (p as any).needsRekey ?? false,
             snapshot: printerRuntime.getSnapshot(p.id),
           },
         },
@@ -113,8 +114,7 @@ export async function registerWsHub(app: FastifyInstance) {
   });
 
   app.get('/api/ws', { websocket: true }, async (socket: WebSocket, req) => {
-    const rawUrl = req.url ?? '';
-    const qs = rawUrl.includes('?') ? rawUrl.slice(rawUrl.indexOf('?') + 1) : '';
+    const qs = (req.url ?? '').includes('?') ? (req.url ?? '').slice((req.url ?? '').indexOf('?') + 1) : '';
     const token = new URLSearchParams(qs).get('token') ?? '';
 
     const client: Client = {

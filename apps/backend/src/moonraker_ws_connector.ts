@@ -50,6 +50,9 @@ export class MoonrakerWsConnector {
   private gcodeRingMax = 200;
 
   constructor(opts: MoonrakerWsConnectorOptions) {
+    if (!opts.apiKey.trim()) {
+      throw new Error('Moonraker apiKey is required for ws');
+    }
     this.opts = opts;
   }
 

@@ -13,6 +13,7 @@ function isBlockedWrite(url: string): boolean {
 
 export function registerReadOnlyGuard(app: FastifyInstance) {
   app.addHook('onRequest', async (req, reply) => {
+    if (!env.ENABLE_WRITE_ACTIONS) return;
     if (!env.BACKEND_READ_ONLY) return;
 
     const method = req.method.toUpperCase();

@@ -140,21 +140,42 @@ export class PrinterRuntimeManager {
   private async getPrinterSecrets(printerId: string) {
     const p = await prisma.printer.findUnique({ where: { id: printerId } });
     if (!p) throw new Error('Printer not found');
-    let apiKey = '';
     try {
-      apiKey = decryptApiKey(p.apiKeyEncrypted, env.PRINTER_API_KEY_ENC_KEY);
+      const apiKey = decryptApiKey(p.apiKeyEncrypted, env.PRINTER_API_KEY_ENC_KEY);
+      if (!apiKey.trim()) throw new Error('Empty api key');
+
+      if (p.needsRekey) {
+        await prisma.printer.update({ where: { id: printerId }, data: { needsRekey: false } });
+      }
+
+      return { baseUrl: p.baseUrl, apiKey };
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      logger.warn({ printerId, err: msg }, 'failed to decrypt printer api key; continuing without api key');
-      apiKey = '';
+      logger.warn({ printerId, err: msg }, 'failed to decrypt printer api key; marking needsRekey and skipping connect');
+      if (!p.needsRekey) {
+        await prisma.printer.update({ where: { id: printerId }, data: { needsRekey: true } });
+      }
+      throw new Error('PRINTER_NEEDS_REKEY');
     }
-    return { baseUrl: p.baseUrl, apiKey };
   }
 
   async ensureConnector(printerId: string) {
     if (this.connectors.has(printerId)) return;
 
-    const { baseUrl, apiKey } = await this.getPrinterSecrets(printerId);
+    let baseUrl: string;
+    let apiKey: string;
+    try {
+      const s = await this.getPrinterSecrets(printerId);
+      baseUrl = s.baseUrl;
+      apiKey = s.apiKey;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (msg === 'PRINTER_NEEDS_REKEY') {
+        // skip connecting
+        return;
+      }
+      throw e;
+    }
 
     const connector = new MoonrakerWsConnector({
       printerId,
@@ -280,6 +301,7 @@ export class PrinterRuntimeManager {
         displayName: input.displayName,
         baseUrl: input.moonrakerBaseUrl,
         apiKeyEncrypted,
+        needsRekey: false,
         bedX: 0,
         bedY: 0,
         bedZ: 0,
@@ -308,6 +330,7 @@ export class PrinterRuntimeManager {
     if (patch.moonrakerBaseUrl !== undefined) data.baseUrl = patch.moonrakerBaseUrl;
     if (patch.moonrakerApiKey !== undefined) {
       data.apiKeyEncrypted = encryptApiKey(patch.moonrakerApiKey, env.PRINTER_API_KEY_ENC_KEY);
+      data.needsRekey = false;
     }
 
     const updated = await prisma.printer.update({ where: { id: printerId }, data });
@@ -360,7 +383,7 @@ export class PrinterRuntimeManager {
   }
 
   async action(printerId: string, action: 'pause' | 'resume' | 'cancel') {
-    if (env.BACKEND_READ_ONLY) {
+    if (env.BACKEND_READ_ONLY || !env.ENABLE_WRITE_ACTIONS) {
       throw new Error('READ_ONLY: printer action blocked');
     }
     const { baseUrl, apiKey } = await this.getPrinterSecrets(printerId);

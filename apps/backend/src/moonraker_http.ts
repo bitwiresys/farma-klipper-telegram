@@ -37,20 +37,32 @@ export class MoonrakerHttp {
 
   constructor(opts: MoonrakerHttpOptions) {
     this.baseUrl = normalizeBaseUrl(opts.baseUrl);
+    if (!opts.apiKey.trim()) {
+      throw new Error('Moonraker apiKey is required');
+    }
     this.apiKey = opts.apiKey;
   }
 
   private headers(): HeadersInit {
-    const headers: Record<string, string> = {
+    return {
       'Content-Type': 'application/json',
+      'X-Api-Key': this.apiKey,
     };
-    if (this.apiKey.trim()) {
-      headers['X-Api-Key'] = this.apiKey;
-    }
-    return headers;
   }
 
   async get<T>(path: string, init?: MoonrakerRequestInit): Promise<T> {
+    const p = path.split('?')[0] ?? path;
+    const allowedGetPrefixes = [
+      '/server/info',
+      '/printer/info',
+      '/server/history/list',
+      '/server/files/metadata',
+      '/server/files/thumbnails',
+    ];
+
+    if (!allowedGetPrefixes.some((x) => p === x || p.startsWith(`${x}?`))) {
+      throw new Error(`READ_ONLY_BLOCKED: moonraker get blocked (${p})`);
+    }
     const url = `${this.baseUrl}${path}`;
     logger.debug({ url }, 'moonraker http get');
     return fetchJson<T>(
@@ -64,30 +76,9 @@ export class MoonrakerHttp {
   }
 
   async post<T>(path: string, body?: unknown, init?: MoonrakerRequestInit): Promise<T> {
-    if (env.BACKEND_READ_ONLY) {
-      const p = path.split('?')[0] ?? path;
-
-      // Allow explicit read-only POST(s)
-      if (p === '/printer/objects/query') {
-        // ok
-      } else {
-        // Block explicit write POSTs
-        const writePrefixes = [
-          '/printer/print/',
-          '/printer/gcode/',
-          '/server/files/',
-          '/printer/emergency_stop',
-          '/machine/',
-          '/server/restart',
-        ];
-
-        if (writePrefixes.some((x) => p.startsWith(x)) || writePrefixes.includes(p)) {
-          throw new Error(`READ_ONLY: moonraker post blocked (${p})`);
-        }
-
-        // Default deny any unknown POSTs in read-only mode
-        throw new Error(`READ_ONLY: moonraker post blocked (${p})`);
-      }
+    const p = path.split('?')[0] ?? path;
+    if (p !== '/printer/objects/query') {
+      throw new Error(`READ_ONLY_BLOCKED: moonraker post blocked (${p})`);
     }
     const url = `${this.baseUrl}${path}`;
     logger.debug({ url }, 'moonraker http post');
@@ -103,7 +94,12 @@ export class MoonrakerHttp {
   }
 
   async queryObjects<T = unknown>(objects: string[], init?: MoonrakerRequestInit): Promise<T> {
-    const qs = objects.map((o) => encodeURIComponent(o)).join('&');
-    return this.get<T>(`/printer/objects/query?${qs}`, init);
+    return this.post<T>(
+      '/printer/objects/query',
+      {
+        objects: Object.fromEntries(objects.map((o) => [o, null])),
+      },
+      init,
+    );
   }
 }

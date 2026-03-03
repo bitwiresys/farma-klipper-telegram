@@ -7,7 +7,10 @@ import { MoonrakerHttp } from '../moonraker_http.js';
 
 async function main() {
   const baseUrl = process.env.MOONRAKER_BASE_URL_BOOTSTRAP ?? 'http://192.168.0.45:7125';
-  const apiKey = process.env.MOONRAKER_API_KEY_BOOTSTRAP ?? '';
+  const apiKey = process.env.MOONRAKER_API_KEY_BOOTSTRAP;
+  if (!apiKey) {
+    throw new Error('MOONRAKER_API_KEY_BOOTSTRAP is required');
+  }
 
   const existingModel = await prisma.printerModel.findFirst({ where: { name: 'Test Model' } });
   const model =
@@ -42,6 +45,7 @@ async function main() {
       displayName: 'Test Printer',
       baseUrl,
       apiKeyEncrypted,
+      needsRekey: false,
       bedX,
       bedY,
       bedZ,
@@ -51,6 +55,7 @@ async function main() {
     update: {
       displayName: 'Test Printer',
       apiKeyEncrypted,
+      needsRekey: false,
       bedX,
       bedY,
       bedZ,

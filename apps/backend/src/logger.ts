@@ -7,6 +7,7 @@ export const loggerOptions: pino.LoggerOptions = {
       'req.headers.authorization',
       'req.headers.x-api-key',
       'req.headers.X-Api-Key',
+      'req.url',
       'req.body.moonrakerApiKey',
       'req.body.apiKeyEncrypted',
       'moonrakerApiKey',

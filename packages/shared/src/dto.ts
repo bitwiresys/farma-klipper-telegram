@@ -24,6 +24,7 @@ export type PrinterDto = {
   bedY: number;
   bedZ: number;
   nozzleDiameter: number;
+  needsRekey: boolean;
   snapshot: PrinterSnapshotDto;
 };
 
