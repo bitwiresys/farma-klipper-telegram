@@ -2,6 +2,7 @@ param(
   [int]$TimeoutSec = 600,
   [string]$RepoDir = "~/apps/farma-klipper-telegram",
   [string]$ServiceName = "farma-backend.service",
+  [switch]$SkipSharedBuild,
   [switch]$SkipInstall,
   [switch]$SkipBuild,
   [switch]$SkipMigrate,
@@ -25,6 +26,10 @@ Invoke-Remote "set -e; cd $RepoDir; git fetch --all --prune; git pull --ff-only"
 
 if (-not $SkipInstall) {
   Invoke-Remote "set -e; cd $RepoDir; pnpm install" 
+}
+
+if (-not $SkipSharedBuild) {
+  Invoke-Remote "set -e; cd $RepoDir; pnpm --filter @farma/shared build" 
 }
 
 if (-not $SkipBuild) {
