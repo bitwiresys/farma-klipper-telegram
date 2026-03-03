@@ -17,3 +17,5 @@
 - CI/TypeScript: `apps/backend` typecheck выполняется через отдельный `tsconfig.typecheck.json`, который маппит `@farma/shared` на `packages/shared/src` (чтобы typecheck не зависел от наличия `packages/shared/dist` в чистом CI).
 
 - Frontend build (Vercel): сборка `apps/frontend` происходит в изоляции и не гарантирует доступ к workspace-пакету `@farma/shared`. Поэтому shared-DTO/compatibility helpers, нужные для UI, дублируются в `apps/frontend/app/lib/*`.
+
+- Contract drift prevention: чтобы не допустить рассинхрон DTO/enum между `packages/shared` и дублированными типами во фронте, в CI добавлен `tools/contract_check.mjs`, который сравнивает ключи DTO и список `CompatibilityReason`.
