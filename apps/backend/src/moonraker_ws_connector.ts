@@ -178,20 +178,21 @@ export class MoonrakerWsConnector {
       'moonraker ws identify ok',
     );
 
-    // Subscribe
+    const baseObjects = {
+      print_stats: null,
+      virtual_sdcard: null,
+      display_status: null,
+      toolhead: null,
+      webhooks: null,
+      extruder: null,
+      heater_bed: null,
+      gcode_move: null,
+      motion_report: null,
+      fan: null,
+    };
+
     const subscribeRes = await this.sendRpc('printer.objects.subscribe', {
-      objects: {
-        print_stats: null,
-        virtual_sdcard: null,
-        display_status: null,
-        toolhead: null,
-        webhooks: null,
-        extruder: null,
-        heater_bed: null,
-        gcode_move: null,
-        motion_report: null,
-        fan: null,
-      },
+      objects: baseObjects,
     });
 
     try {
@@ -227,9 +228,18 @@ export class MoonrakerWsConnector {
 
       const unique = Array.from(new Set(candidates)).slice(0, 12);
       if (unique.length > 0) {
-        await this.sendRpc('printer.objects.subscribe', {
-          objects: Object.fromEntries(unique.map((k) => [k, null])),
+        const extraObjects = Object.fromEntries(unique.map((k) => [k, null]));
+        const extraRes = await this.sendRpc('printer.objects.subscribe', {
+          objects: { ...baseObjects, ...extraObjects },
         });
+        try {
+          const initialStatus = (extraRes as any)?.status;
+          if (initialStatus && typeof initialStatus === 'object') {
+            this.opts.callbacks.onStatusUpdate(initialStatus);
+          }
+        } catch {
+          // ignore
+        }
         this.extraSubscribedObjects = unique;
         logger.info(
           { printerId: this.opts.printerId, objects: unique },
