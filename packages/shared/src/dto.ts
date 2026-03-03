@@ -18,7 +18,8 @@ export type PrinterSnapshotDto = {
 export type PrinterDto = {
   id: string;
   displayName: string;
-  model: string;
+  modelId: string;
+  modelName: string;
   bedX: number;
   bedY: number;
   bedZ: number;

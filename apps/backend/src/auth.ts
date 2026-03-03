@@ -18,13 +18,13 @@ function unauthorized(reply: FastifyReply, message = 'UNAUTHORIZED') {
 
 export function registerAuthMiddleware(app: FastifyInstance) {
   app.addHook('onRequest', async (req, reply) => {
-    const url = req.url;
+    const pathname = req.url.split('?')[0] ?? '';
 
-    if (!url.startsWith('/api/')) return;
+    if (!pathname.startsWith('/api/')) return;
 
-    if (url === '/api/health') return;
-    if (url === '/api/auth/telegram') return;
-    if (url.startsWith('/api/ws')) return;
+    if (pathname === '/api/health') return;
+    if (pathname === '/api/auth/telegram') return;
+    if (pathname.startsWith('/api/ws')) return;
 
     const authHeader = req.headers.authorization;
     if (!authHeader) return unauthorized(reply, 'Missing Authorization header');

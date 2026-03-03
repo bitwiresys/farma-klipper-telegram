@@ -8,7 +8,7 @@ export const AuthTelegramSchema = z.object({
 
 export const CreatePrinterSchema = z.object({
   displayName: z.string().min(1).max(100),
-  model: z.string().min(1).max(100),
+  modelId: z.string().min(1),
   moonrakerBaseUrl: z.string().url(),
   moonrakerApiKey: z.string().min(1),
 });
@@ -16,7 +16,7 @@ export const CreatePrinterSchema = z.object({
 export const UpdatePrinterSchema = z
   .object({
     displayName: z.string().min(1).max(100).optional(),
-    model: z.string().min(1).max(100).optional(),
+    modelId: z.string().min(1).optional(),
     moonrakerBaseUrl: z.string().url().optional(),
     moonrakerApiKey: z.string().min(1).optional(),
   })
@@ -78,7 +78,8 @@ export const PrinterDtoSchema = z
   .object({
     id: z.string(),
     displayName: z.string(),
-    model: z.string(),
+    modelId: z.string(),
+    modelName: z.string(),
     bedX: z.number(),
     bedY: z.number(),
     bedZ: z.number(),

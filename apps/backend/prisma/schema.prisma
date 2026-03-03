@@ -27,7 +27,7 @@ model User {
 
 model PrinterModel {
   id          String   @id @default(cuid())
-  title       String
+  name        String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
