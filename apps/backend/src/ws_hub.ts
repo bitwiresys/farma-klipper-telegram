@@ -96,15 +96,15 @@ export class WsHub {
   }
 }
 
-export async function registerWsHub(app: FastifyInstance) {
-  const hub = new WsHub();
+export const wsHub = new WsHub();
 
+export async function registerWsHub(app: FastifyInstance) {
   printerRuntime.setOnPrinterSnapshot((printerId) => {
-    hub.markPrinterDirty(printerId);
+    wsHub.markPrinterDirty(printerId);
   });
 
   printerRuntime.setOnHistoryEvent((printerId, history) => {
-    hub.broadcast({
+    wsHub.broadcast({
       type: 'HISTORY_EVENT',
       payload: {
         printerId,
@@ -122,10 +122,10 @@ export async function registerWsHub(app: FastifyInstance) {
       close: (code, reason) => socket.close(code, reason),
     };
 
-    await hub.addClient(client, token);
+    await wsHub.addClient(client, token);
 
     socket.on('close', () => {
-      hub.removeClient(client);
+      wsHub.removeClient(client);
     });
   };
 

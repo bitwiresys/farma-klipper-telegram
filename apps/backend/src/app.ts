@@ -1,5 +1,6 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
+import multipart from '@fastify/multipart';
 import rateLimit from '@fastify/rate-limit';
 import websocket from '@fastify/websocket';
 
@@ -13,6 +14,7 @@ import { registerPrinterModelsRoutes } from './routes_printer_models.js';
 import { registerPrintersRoutes } from './routes_printers.js';
 import { registerSnapshotRoutes } from './routes_snapshot.js';
 import { registerHistoryRoutes } from './routes_history.js';
+import { registerPresetsRoutes } from './routes_presets.js';
 import { registerWsHub } from './ws_hub.js';
 
 export async function buildApp() {
@@ -42,6 +44,12 @@ export async function buildApp() {
     timeWindow: '1 minute',
   });
 
+  await app.register(multipart, {
+    limits: {
+      fileSize: 250 * 1024 * 1024,
+    },
+  });
+
   await app.register(websocket);
 
   app.get('/api/health', async () => ({ ok: true }));
@@ -55,6 +63,7 @@ export async function buildApp() {
   await registerPrintersRoutes(app);
   await registerSnapshotRoutes(app);
   await registerHistoryRoutes(app);
+  await registerPresetsRoutes(app);
   await registerWsHub(app);
 
   return app;

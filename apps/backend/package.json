@@ -17,6 +17,7 @@
   "dependencies": {
     "@farma/shared": "workspace:*",
     "@fastify/cors": "^10.0.0",
+    "@fastify/multipart": "^9.2.1",
     "@fastify/rate-limit": "^10.2.0",
     "@fastify/websocket": "^11.0.0",
     "@prisma/client": "^6.3.1",

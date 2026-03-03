@@ -73,15 +73,24 @@ model Preset {
   thumbnailPath String?
   gcodeMeta     Json?
 
-  allowedNozzleDiameters Json
-  minBedX       Float
-  minBedY       Float
+  compatibilityRules PresetCompatibilityRules?
 
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
   allowedModels PresetAllowedModel[]
   deployments   PresetDeployment[]
+}
+
+model PresetCompatibilityRules {
+  id            String  @id @default(cuid())
+  presetId      String  @unique
+
+  minBedX       Float
+  minBedY       Float
+  allowedNozzleDiameters Json
+
+  preset        Preset  @relation(fields: [presetId], references: [id], onDelete: Cascade)
 }
 
 model PresetAllowedModel {
@@ -101,10 +110,8 @@ model PresetDeployment {
   printerId      String
 
   remoteFilename String
-  checksum       String
-
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  checksumSha256 String
+  uploadedAt     DateTime @default(now())
 
   preset         Preset  @relation(fields: [presetId], references: [id], onDelete: Cascade)
   printer        Printer @relation(fields: [printerId], references: [id], onDelete: Cascade)
