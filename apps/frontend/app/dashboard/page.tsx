@@ -8,7 +8,7 @@ import { AppShell } from '../components/AppShell';
 import { useAuth } from '../auth/auth_context';
 import { apiRequest } from '../lib/api';
 import { connectBackendWs } from '../lib/ws';
-import { getTelegramInitData, isTelegramWebApp } from '../lib/telegram';
+import { getTelegramInitData, isTelegramWebApp, telegramReady, waitForTelegramWebApp } from '../lib/telegram';
 
 type WsEvent = { type: string; payload: any };
 
@@ -36,6 +36,10 @@ export default function DashboardPage() {
 
   const [wsStatus, setWsStatus] = useState<'idle' | 'connecting' | 'open' | 'closed' | 'error'>('idle');
   const [err, setErr] = useState<string | null>(null);
+  const [tgDebug, setTgDebug] = useState<{ hasTelegram: boolean; initDataLen: number }>({
+    hasTelegram: false,
+    initDataLen: 0,
+  });
   const [printers, setPrinters] = useState<PrinterDto[]>([]);
   const [loginState, setLoginState] = useState<LoginState>({ state: 'ready_to_login' });
 
@@ -44,13 +48,22 @@ export default function DashboardPage() {
       setLoginState({ state: 'authed' });
       return;
     }
-    setLoginState({ state: isTelegramWebApp() ? 'ready_to_login' : 'need_telegram' });
+    (async () => {
+      await waitForTelegramWebApp(2500);
+      telegramReady();
+      const hasTelegram = isTelegramWebApp();
+      const initDataLen = getTelegramInitData().length;
+      setTgDebug({ hasTelegram, initDataLen });
+      setLoginState({ state: hasTelegram ? 'ready_to_login' : 'need_telegram' });
+    })();
   }, [token]);
 
   const login = async () => {
     setErr(null);
     setLoginState({ state: 'logging_in' });
     try {
+      await waitForTelegramWebApp(2500);
+      telegramReady();
       const initData = getTelegramInitData();
       if (!initData) throw new Error('Telegram initData is empty');
       const res = await apiRequest<{ token: string }>('/api/auth/telegram', {
@@ -133,6 +146,9 @@ export default function DashboardPage() {
 
       {loginState.state !== 'authed' && (
         <div className="mt-3 rounded border border-slate-800 bg-slate-900/40 p-3">
+          <div className="text-xs text-slate-400">
+            telegram: {tgDebug.hasTelegram ? 'yes' : 'no'}; initDataLen: {tgDebug.initDataLen}
+          </div>
           {loginState.state === 'need_telegram' && (
             <div className="text-xs text-slate-300">
               Открой миниапку из Telegram.
