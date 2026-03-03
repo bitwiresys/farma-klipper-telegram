@@ -13,6 +13,11 @@ model User {
   chatId      String?
   isAllowed   Boolean  @default(false)
 
+  notificationsEnabled Boolean @default(true)
+  notifyFirstLayer     Boolean @default(true)
+  notifyComplete       Boolean @default(true)
+  notifyError          Boolean @default(true)
+
   muteFirstLayerDone Boolean @default(false)
   mutePrintComplete  Boolean @default(false)
   mutePrintError     Boolean @default(false)
@@ -43,6 +48,10 @@ model Printer {
   apiKeyEncrypted String
 
   needsRekey      Boolean  @default(false)
+
+  currentPrintSessionId String?
+  currentFilename       String?
+  currentStartTimeSec   Int?
 
   bedX            Float
   bedY            Float
@@ -148,7 +157,7 @@ model NotificationLog {
   printSessionId String
   eventType      String
 
-  createdAt      DateTime @default(now())
+  sentAt         DateTime @default(now())
 
   printer        Printer  @relation(fields: [printerId], references: [id], onDelete: Cascade)
 

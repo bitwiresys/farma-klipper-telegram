@@ -47,6 +47,9 @@ function isProtectedApiRoute(method: string, pathname: string): boolean {
   if (m === 'DELETE' && /^\/api\/printer-models\/[^/]+$/.test(pathname))
     return true;
 
+  if (m === 'GET' && pathname === '/api/settings/notifications') return true;
+  if (m === 'PATCH' && pathname === '/api/settings/notifications') return true;
+
   return false;
 }
 

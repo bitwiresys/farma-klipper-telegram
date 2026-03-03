@@ -207,6 +207,15 @@ export class PrinterRuntimeManager {
   private rawStatus = new Map<string, RawStatus>();
   private connectors = new Map<string, MoonrakerWsConnector>();
 
+  private sessionCache = new Map<
+    string,
+    {
+      printSessionId: string | null;
+      filename: string | null;
+      startTimeSec: number | null;
+    }
+  >();
+
   // batching to WS hub
   private dirtyPrinters = new Set<string>();
   private onPrinterSnapshot?: (printerId: string) => void;
@@ -215,12 +224,79 @@ export class PrinterRuntimeManager {
     history: PrintHistoryDto,
   ) => void;
 
+  private onRawStatus?: (printerId: string, rawStatus: RawStatus) => void;
+  private onGcodeLine?: (printerId: string, line: string) => void;
+
   setOnPrinterSnapshot(cb: (printerId: string) => void) {
     this.onPrinterSnapshot = cb;
   }
 
   setOnHistoryEvent(cb: (printerId: string, history: PrintHistoryDto) => void) {
     this.onHistoryEvent = cb;
+  }
+
+  setOnRawStatusUpdate(cb: (printerId: string, rawStatus: RawStatus) => void) {
+    this.onRawStatus = cb;
+  }
+
+  setOnGcodeResponse(cb: (printerId: string, line: string) => void) {
+    this.onGcodeLine = cb;
+  }
+
+  async getOrCreatePrintSessionId(
+    printerId: string,
+    input: { filename: string | null; state: PrinterState },
+  ): Promise<string | null> {
+    const cached = this.sessionCache.get(printerId);
+    if (cached?.printSessionId) return cached.printSessionId;
+
+    const p = await prisma.printer.findUnique({ where: { id: printerId } });
+    const existing = p?.currentPrintSessionId ?? null;
+    if (existing) {
+      this.sessionCache.set(printerId, {
+        printSessionId: existing,
+        filename: p?.currentFilename ?? null,
+        startTimeSec: p?.currentStartTimeSec ?? null,
+      });
+      return existing;
+    }
+
+    if (input.state !== PrinterState.printing) return null;
+    const filename = input.filename;
+    if (!filename) return null;
+
+    const startTimeSec = Math.floor(Date.now() / 1000);
+    const printSessionId = `${printerId}:${filename}:${startTimeSec}`;
+    await prisma.printer.update({
+      where: { id: printerId },
+      data: {
+        currentPrintSessionId: printSessionId,
+        currentFilename: filename,
+        currentStartTimeSec: startTimeSec,
+      },
+    });
+    this.sessionCache.set(printerId, {
+      printSessionId,
+      filename,
+      startTimeSec,
+    });
+    return printSessionId;
+  }
+
+  async clearPrintSession(printerId: string) {
+    await prisma.printer.update({
+      where: { id: printerId },
+      data: {
+        currentPrintSessionId: null,
+        currentFilename: null,
+        currentStartTimeSec: null,
+      },
+    });
+    this.sessionCache.set(printerId, {
+      printSessionId: null,
+      filename: null,
+      startTimeSec: null,
+    });
   }
 
   markDirty(printerId: string) {
@@ -344,9 +420,12 @@ export class PrinterRuntimeManager {
           internal.updatedAtMs = now;
 
           this.markDirty(printerId);
+
+          this.onRawStatus?.(printerId, merged);
         },
         onHistoryChanged: async (payload) => {
           const now = new Date();
+          const action = String((payload as any)?.action ?? '').toLowerCase();
           const filename = String(
             (payload as any)?.filename ??
               (payload as any)?.job?.filename ??
@@ -356,9 +435,44 @@ export class PrinterRuntimeManager {
             (payload as any)?.status ?? (payload as any)?.action ?? 'changed',
           );
           const status = normalizeHistoryStatus(rawStatus);
-          const printSessionId =
+          const printSessionIdRaw =
             String((payload as any)?.uid ?? (payload as any)?.job_id ?? '') ||
             null;
+
+          const currentFromCache =
+            this.sessionCache.get(printerId)?.printSessionId ?? null;
+          const currentFromDb =
+            (await prisma.printer.findUnique({ where: { id: printerId } }))
+              ?.currentPrintSessionId ?? null;
+
+          let printSessionId: string | null =
+            currentFromCache ?? currentFromDb ?? printSessionIdRaw;
+
+          if (action === 'added') {
+            const startTimeSecRaw =
+              numOrNull((payload as any)?.job?.start_time) ??
+              numOrNull((payload as any)?.start_time);
+            const startTimeSec =
+              startTimeSecRaw === null
+                ? Math.floor(Date.now() / 1000)
+                : Math.floor(startTimeSecRaw);
+            const computed = `${printerId}:${filename}:${startTimeSec}`;
+            await prisma.printer.update({
+              where: { id: printerId },
+              data: {
+                currentPrintSessionId: computed,
+                currentFilename: filename,
+                currentStartTimeSec: startTimeSec,
+              },
+            });
+            this.sessionCache.set(printerId, {
+              printSessionId: computed,
+              filename,
+              startTimeSec,
+            });
+
+            printSessionId = computed;
+          }
 
           const existing =
             printSessionId === null
@@ -407,8 +521,8 @@ export class PrinterRuntimeManager {
             errorMessage: saved.errorMessage,
           });
         },
-        onGcodeResponse: (_line) => {
-          // buffered inside connector
+        onGcodeResponse: (line) => {
+          this.onGcodeLine?.(printerId, line);
         },
       },
     });
