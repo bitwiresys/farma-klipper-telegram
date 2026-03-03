@@ -13,3 +13,5 @@
   - hash = hex(HMAC_SHA256(key=secret_key, msg=data_check_string))
 
 - Moonraker WS auth: выбираем стабильный путь A) WS handshake с заголовком `X-Api-Key`, если библиотека позволяет; если на практике заголовки в WS недоступны/не работают, fallback B) connect -> `server.connection.identify(api_key=...)` с логированием `authenticated=true/false`.
+
+- CI/TypeScript: `apps/backend` typecheck выполняется через отдельный `tsconfig.typecheck.json`, который маппит `@farma/shared` на `packages/shared/src` (чтобы typecheck не зависел от наличия `packages/shared/dist` в чистом CI).

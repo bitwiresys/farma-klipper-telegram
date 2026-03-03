@@ -188,7 +188,7 @@ export async function registerPresetsRoutes(app: FastifyInstance) {
         gcodeMeta: Prisma.DbNull,
         allowedModels: {
           create: parsed.data.compatibilityRules.allowedModelIds.map(
-            (modelId) => ({ modelId }),
+            (modelId: string) => ({ modelId }),
           ),
         },
         compatibilityRules: {
@@ -246,7 +246,9 @@ export async function registerPresetsRoutes(app: FastifyInstance) {
           rules && Array.isArray(rules.allowedModelIds)
             ? {
                 deleteMany: {},
-                create: rules.allowedModelIds.map((modelId) => ({ modelId })),
+                create: rules.allowedModelIds.map((modelId: string) => ({
+                  modelId,
+                })),
               }
             : undefined,
         compatibilityRules: rules
