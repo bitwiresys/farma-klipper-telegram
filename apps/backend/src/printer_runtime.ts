@@ -108,6 +108,8 @@ function computeSnapshotFromStatus(raw: RawStatus): {
   const temps = {
     extruder: numOrNull(ext.temperature),
     bed: numOrNull(bed.temperature),
+    extruderTarget: numOrNull((ext as any).target),
+    bedTarget: numOrNull((bed as any).target),
   };
 
   const layers = {
@@ -172,6 +174,7 @@ function computeSnapshotFromStatus(raw: RawStatus): {
       filename,
       progress,
       etaSec: null,
+      message: strOrNull((ps as any).message),
       temps,
       layers,
       position: {

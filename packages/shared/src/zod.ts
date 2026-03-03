@@ -64,9 +64,12 @@ export const PrinterSnapshotSchema = z.object({
   filename: z.string().nullable(),
   progress: z.number().min(0).max(1).nullable(),
   etaSec: z.number().int().min(0).nullable(),
+  message: z.string().nullable().optional(),
   temps: z.object({
     extruder: z.number().nullable(),
     bed: z.number().nullable(),
+    extruderTarget: z.number().nullable().optional(),
+    bedTarget: z.number().nullable().optional(),
   }),
   layers: z.object({
     current: z.number().int().min(0).nullable(),

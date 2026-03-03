@@ -22,7 +22,7 @@ export default function RootLayout({
         />
       </head>
       <body
-        className="min-h-screen bg-slate-950 text-slate-50"
+        className="min-h-screen bg-bg font-sans text-textPrimary"
         data-app-version={process.env.NEXT_PUBLIC_APP_VERSION ?? ''}
       >
         <AuthProvider>{children}</AuthProvider>

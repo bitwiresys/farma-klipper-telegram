@@ -10,9 +10,12 @@ export type PrinterSnapshotDto = {
   filename: string | null;
   progress: number | null;
   etaSec: number | null;
+  message?: string | null;
   temps: {
     extruder: number | null;
     bed: number | null;
+    extruderTarget?: number | null;
+    bedTarget?: number | null;
   };
   layers: {
     current: number | null;

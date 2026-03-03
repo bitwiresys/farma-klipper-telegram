@@ -6,6 +6,12 @@ import { useEffect, useState } from 'react';
 import type { PrinterDto, PrintHistoryDto } from '../lib/dto';
 
 import { AppShell } from '../components/AppShell';
+import { BottomSheet } from '../components/ui/BottomSheet';
+import { Button } from '../components/ui/Button';
+import { Card } from '../components/ui/Card';
+import { EmptyState } from '../components/ui/EmptyState';
+import { ProgressBar } from '../components/ui/ProgressBar';
+import { StatusPill } from '../components/ui/StatusPill';
 import { useAuth } from '../auth/auth_context';
 import { apiRequest } from '../lib/api';
 import { connectBackendWs } from '../lib/ws';
@@ -26,7 +32,7 @@ type LoginState =
 
 function fmtPct(x: number | null): string {
   if (x === null) return '-';
-  return `${Math.round(x * 1000) / 10}%`;
+  return `${Math.round(x * 100)}%`;
 }
 
 function fmtEta(sec: number | null): string {
@@ -73,6 +79,17 @@ export default function DashboardPage() {
     initDataLen: 0,
   });
   const [printers, setPrinters] = useState<PrinterDto[]>([]);
+  const [errorDetails, setErrorDetails] = useState<{
+    open: boolean;
+    title: string;
+    message: string;
+  }>({ open: false, title: '', message: '' });
+  const [cancelConfirm, setCancelConfirm] = useState<{
+    open: boolean;
+    printerId: string;
+    printerName: string;
+    filename: string;
+  }>({ open: false, printerId: '', printerName: '', filename: '' });
   const [loginState, setLoginState] = useState<LoginState>({
     state: 'logging_in',
   });
@@ -120,6 +137,33 @@ export default function DashboardPage() {
       setErr(e instanceof Error ? e.message : String(e));
       setLoginState({ state: 'need_telegram' });
     }
+  };
+
+  const pause = async (printerId: string) => {
+    if (!token) return;
+    setErr(null);
+    await apiRequest(`/api/printers/${printerId}/pause`, {
+      token,
+      method: 'POST',
+    });
+  };
+
+  const resume = async (printerId: string) => {
+    if (!token) return;
+    setErr(null);
+    await apiRequest(`/api/printers/${printerId}/resume`, {
+      token,
+      method: 'POST',
+    });
+  };
+
+  const cancel = async (printerId: string) => {
+    if (!token) return;
+    setErr(null);
+    await apiRequest(`/api/printers/${printerId}/cancel`, {
+      token,
+      method: 'POST',
+    });
   };
 
   const load = async () => {
@@ -184,10 +228,17 @@ export default function DashboardPage() {
   };
 
   return (
-    <AppShell>
+    <AppShell wsStatus={wsStatus}>
       <div className="flex items-center justify-between">
-        <div className="text-sm font-medium">Dashboard</div>
-        <div className="text-xs text-slate-400">ws: {wsStatus}</div>
+        <div className="text-xs text-textSecondary">
+          {loginState.state === 'authed' ? 'Your printers' : ''}
+        </div>
+        <div className="flex gap-2">
+          <Button variant="secondary" onClick={() => void load()}>
+            Refresh
+          </Button>
+          <Link href="/printers" className="hidden" />
+        </div>
       </div>
 
       {loginState.state !== 'authed' && (
@@ -228,106 +279,185 @@ export default function DashboardPage() {
 
       {loginState.state === 'authed' && (
         <>
-          <button
-            className="mt-3 w-full rounded bg-slate-950 px-3 py-2 text-xs"
-            onClick={() => void load()}
-          >
-            Refresh snapshot
-          </button>
-
           <div className="mt-3 space-y-3">
-            {printers.map((p) => (
-              <div
-                key={p.id}
-                className="rounded border border-slate-800 bg-slate-900/40 p-3"
-              >
-                <div className="flex items-start justify-between">
-                  <Link href={`/printers/${p.id}`} className="block">
-                    <div className="text-sm font-medium">{p.displayName}</div>
-                    <div className="text-xs text-slate-400">{p.modelName}</div>
-                  </Link>
-                  {p.needsRekey && (
-                    <div className="text-xs text-amber-400">needs rekey</div>
+            {printers.map((p) => {
+              const st = p.snapshot.state;
+              const showActions =
+                st === 'printing' || st === 'paused' || st === 'error';
+              return (
+                <Card
+                  key={p.id}
+                  className={st === 'error' ? 'border-danger/40' : ''}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <Link href={`/printers/${p.id}`} className="block min-w-0">
+                      <div className="truncate text-[16px] font-semibold text-textPrimary">
+                        {p.displayName}
+                      </div>
+                      <div className="truncate text-xs text-textSecondary">
+                        {p.modelName}
+                      </div>
+                    </Link>
+                    <StatusPill state={st} />
+                  </div>
+
+                  <div className="mt-3">
+                    <ProgressBar value01={p.snapshot.progress} />
+                    <div className="mt-2 flex items-center justify-between text-xs">
+                      <div className="min-w-0 truncate text-textSecondary">
+                        {p.snapshot.filename ?? '—'}
+                      </div>
+                      <div className="shrink-0 text-textPrimary">
+                        {fmtPct(p.snapshot.progress)}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
+                    <div className="rounded-btn border border-border/70 bg-surface2 p-2">
+                      <div className="text-textMuted">ETA</div>
+                      <div className="text-textPrimary">
+                        {fmtEta(p.snapshot.etaSec)}
+                      </div>
+                    </div>
+                    <div className="rounded-btn border border-border/70 bg-surface2 p-2">
+                      <div className="text-textMuted">Temps</div>
+                      <div className="text-textPrimary">
+                        {p.snapshot.temps.extruder ?? '—'}/
+                        {p.snapshot.temps.bed ?? '—'}
+                      </div>
+                    </div>
+                    <div className="rounded-btn border border-border/70 bg-surface2 p-2">
+                      <div className="text-textMuted">Layers</div>
+                      <div className="text-textPrimary">
+                        {p.snapshot.layers.current ?? '—'}/
+                        {p.snapshot.layers.total ?? '—'}
+                      </div>
+                    </div>
+                  </div>
+
+                  {showActions && (
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      {st === 'printing' && (
+                        <Button
+                          variant="secondary"
+                          onClick={() => void pause(p.id)}
+                        >
+                          Pause
+                        </Button>
+                      )}
+                      {st === 'paused' && (
+                        <Button
+                          variant="primary"
+                          onClick={() => void resume(p.id)}
+                        >
+                          Resume
+                        </Button>
+                      )}
+                      <Button
+                        variant="destructive"
+                        onClick={() =>
+                          setCancelConfirm({
+                            open: true,
+                            printerId: p.id,
+                            printerName: p.displayName,
+                            filename: p.snapshot.filename ?? '—',
+                          })
+                        }
+                      >
+                        Cancel
+                      </Button>
+                      {st === 'error' && (
+                        <Button
+                          variant="secondary"
+                          onClick={() =>
+                            setErrorDetails({
+                              open: true,
+                              title: p.displayName,
+                              message: p.snapshot.message ?? '(no message)',
+                            })
+                          }
+                        >
+                          Details
+                        </Button>
+                      )}
+                    </div>
                   )}
-                </div>
-
-                <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
-                  <div className="rounded bg-slate-950 p-2">
-                    <div className="text-slate-400">state</div>
-                    <div>{p.snapshot.state}</div>
-                  </div>
-                  <div className="rounded bg-slate-950 p-2">
-                    <div className="text-slate-400">progress</div>
-                    <div>{fmtPct(p.snapshot.progress)}</div>
-                  </div>
-                  <div className="rounded bg-slate-950 p-2">
-                    <div className="text-slate-400">ETA</div>
-                    <div>{fmtEta(p.snapshot.etaSec)}</div>
-                  </div>
-                  <div className="rounded bg-slate-950 p-2">
-                    <div className="text-slate-400">temps</div>
-                    <div>
-                      E {p.snapshot.temps.extruder ?? '-'} / B{' '}
-                      {p.snapshot.temps.bed ?? '-'}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-2 text-xs text-slate-300">
-                  <div className="text-slate-400">file</div>
-                  <div className="break-all">{p.snapshot.filename ?? '-'}</div>
-                </div>
-
-                <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
-                  <div className="rounded bg-slate-950 p-2">
-                    <div className="text-slate-400">XYZ live</div>
-                    <div>{fmtXYZ(p.snapshot.position?.live)}</div>
-                  </div>
-                  <div className="rounded bg-slate-950 p-2">
-                    <div className="text-slate-400">XYZ cmd</div>
-                    <div>{fmtXYZ(p.snapshot.position?.commanded)}</div>
-                  </div>
-                  <div className="rounded bg-slate-950 p-2">
-                    <div className="text-slate-400">speed</div>
-                    <div>
-                      v {fmtNum(p.snapshot.speed?.liveVelocityMmS, 1)} / g{' '}
-                      {fmtNum(p.snapshot.speed?.gcodeSpeedMmS, 1)} mm/s
-                    </div>
-                    <div className="text-slate-400">
-                      factor {fmtPct01(p.snapshot.speed?.speedFactor)}
-                    </div>
-                  </div>
-                  <div className="rounded bg-slate-950 p-2">
-                    <div className="text-slate-400">flow / fan</div>
-                    <div>flow {fmtPct01(p.snapshot.speed?.flowFactor)}</div>
-                    <div>
-                      fan {fmtPct01(p.snapshot.fans?.part?.speed)}
-                      {p.snapshot.fans?.part?.rpm !== null &&
-                        p.snapshot.fans?.part?.rpm !== undefined &&
-                        ` (${fmtNum(p.snapshot.fans?.part?.rpm, 0)} rpm)`}
-                    </div>
-                  </div>
-                  <div className="rounded bg-slate-950 p-2">
-                    <div className="text-slate-400">chamber</div>
-                    <div>{fmtNum(p.snapshot.chamberTemp, 1)}</div>
-                  </div>
-                  <div className="rounded bg-slate-950 p-2">
-                    <div className="text-slate-400">limits</div>
-                    <div>
-                      v {fmtNum(p.snapshot.limits?.maxVelocity, 0)} a{' '}
-                      {fmtNum(p.snapshot.limits?.maxAccel, 0)}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
+                </Card>
+              );
+            })}
 
             {printers.length === 0 && (
-              <div className="text-xs text-slate-400">No printers.</div>
+              <EmptyState
+                title="No printers"
+                subtitle="Add your first printer to see status here."
+                actionLabel="Add printer"
+                onAction={() => {
+                  window.location.href = '/printers';
+                }}
+              />
             )}
           </div>
         </>
       )}
+
+      <BottomSheet
+        open={errorDetails.open}
+        title={`Error: ${errorDetails.title}`}
+        onClose={() => setErrorDetails({ open: false, title: '', message: '' })}
+      >
+        <div className="text-xs text-textSecondary">{errorDetails.message}</div>
+      </BottomSheet>
+
+      <BottomSheet
+        open={cancelConfirm.open}
+        title="Cancel print?"
+        onClose={() =>
+          setCancelConfirm({
+            open: false,
+            printerId: '',
+            printerName: '',
+            filename: '',
+          })
+        }
+      >
+        <div className="text-xs text-textSecondary">
+          {cancelConfirm.printerName}
+        </div>
+        <div className="mt-1 break-all text-xs text-textMuted">
+          {cancelConfirm.filename}
+        </div>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <Button
+            variant="secondary"
+            onClick={() =>
+              setCancelConfirm({
+                open: false,
+                printerId: '',
+                printerName: '',
+                filename: '',
+              })
+            }
+          >
+            Keep printing
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={() => {
+              const id = cancelConfirm.printerId;
+              setCancelConfirm({
+                open: false,
+                printerId: '',
+                printerName: '',
+                filename: '',
+              });
+              void cancel(id);
+            }}
+          >
+            Cancel print
+          </Button>
+        </div>
+      </BottomSheet>
     </AppShell>
   );
 }

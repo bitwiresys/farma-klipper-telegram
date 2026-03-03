@@ -4,51 +4,142 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
 
+import { Clock, FolderOpen, LayoutGrid, Printer, Settings } from 'lucide-react';
+
 import { useAuth } from '../auth/auth_context';
 
-function NavItem({ href, label }: { href: string; label: string }) {
+type TabKey = 'dashboard' | 'presets' | 'printers' | 'history' | 'settings';
+
+function titleFromPath(pathname: string): { title: string; tab?: TabKey } {
+  if (pathname.startsWith('/dashboard'))
+    return { title: 'Dashboard', tab: 'dashboard' };
+  if (pathname.startsWith('/presets'))
+    return { title: 'Presets', tab: 'presets' };
+  if (pathname.startsWith('/printers'))
+    return { title: 'Printers', tab: 'printers' };
+  if (pathname.startsWith('/history'))
+    return { title: 'History', tab: 'history' };
+  if (pathname.startsWith('/settings'))
+    return { title: 'Settings', tab: 'settings' };
+  return { title: 'Farma' };
+}
+
+function NavItem({
+  href,
+  label,
+  icon,
+  active,
+}: {
+  href: string;
+  label: string;
+  icon: ReactNode;
+  active: boolean;
+}) {
   const pathname = usePathname();
-  const active = pathname === href;
+  void pathname;
   return (
     <Link
       href={href}
       className={
-        'flex-1 rounded px-2 py-2 text-center text-xs ' +
-        (active
-          ? 'bg-slate-200 text-slate-950'
-          : 'bg-slate-900/40 text-slate-200')
+        'relative flex flex-col items-center justify-center rounded-btn px-2 py-2 text-[11px] transition active:scale-[0.98] ' +
+        (active ? 'text-accentCyan' : 'text-textMuted')
       }
     >
-      {label}
+      <div className="mb-1">{icon}</div>
+      <div>{label}</div>
+      {active && (
+        <div className="absolute bottom-0 left-2 right-2 h-[2px] rounded-full bg-accentCyan" />
+      )}
     </Link>
   );
 }
 
-export function AppShell({ children }: { children: ReactNode }) {
+export function AppShell({
+  children,
+  wsStatus,
+}: {
+  children: ReactNode;
+  wsStatus?: 'idle' | 'connecting' | 'open' | 'closed' | 'error';
+}) {
   const { token } = useAuth();
   const v = process.env.NEXT_PUBLIC_APP_VERSION ?? '';
+  const pathname = usePathname();
+  const { title, tab } = titleFromPath(pathname);
+
+  const wsText =
+    wsStatus === 'open'
+      ? 'Live'
+      : wsStatus === 'connecting'
+        ? 'Reconnecting…'
+        : wsStatus === 'error'
+          ? 'Error'
+          : wsStatus === 'closed'
+            ? 'Closed'
+            : '';
+
+  const wsDot =
+    wsStatus === 'open'
+      ? 'bg-success'
+      : wsStatus === 'connecting'
+        ? 'bg-warning'
+        : wsStatus === 'error'
+          ? 'bg-danger'
+          : 'bg-offlineGray';
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-xl flex-col p-4">
+    <div className="mx-auto flex min-h-screen max-w-xl flex-col px-4 pb-4 pt-4">
       <div className="flex items-center justify-between">
         <div>
-          <div className="text-lg font-semibold">Farma</div>
+          <div className="text-[18px] font-semibold text-textPrimary">
+            {title}
+          </div>
         </div>
 
-        <div className="text-right text-xs text-slate-400">
-          <div>v={v || '-'}</div>
-          <div>{token ? 'auth: ok' : 'auth: none'}</div>
+        <div className="text-right text-[11px] text-textSecondary">
+          <div className="flex items-center justify-end gap-2">
+            <div className={`h-2 w-2 rounded-full ${wsDot}`} />
+            <div>{wsText || '—'}</div>
+          </div>
+          <div className="text-textMuted">v={v || '-'}</div>
+          <div className="text-textMuted">
+            {token ? 'auth ok' : 'auth none'}
+          </div>
         </div>
       </div>
 
       <div className="mt-4 flex-1">{children}</div>
 
-      <div className="mt-4 grid grid-cols-5 gap-2">
-        <NavItem href="/dashboard" label="Dashboard" />
-        <NavItem href="/printers" label="Printers" />
-        <NavItem href="/history" label="History" />
-        <NavItem href="/presets" label="Presets" />
-        <NavItem href="/settings" label="Settings" />
+      <div className="mt-4 grid grid-cols-5 gap-2 rounded-card border border-border/70 bg-surface1 p-2">
+        <NavItem
+          href="/dashboard"
+          label="Dashboard"
+          icon={<LayoutGrid size={20} />}
+          active={tab === 'dashboard'}
+        />
+        <NavItem
+          href="/presets"
+          label="Presets"
+          icon={<FolderOpen size={20} />}
+          active={tab === 'presets'}
+        />
+        <NavItem
+          href="/printers"
+          label="Printers"
+          icon={<Printer size={20} />}
+          active={tab === 'printers'}
+        />
+        <NavItem
+          href="/history"
+          label="History"
+          icon={<Clock size={20} />}
+          active={tab === 'history'}
+        />
+        <NavItem
+          href="/settings"
+          label="Settings"
+          icon={<Settings size={20} />}
+          active={tab === 'settings'}
+        />
       </div>
     </div>
   );
