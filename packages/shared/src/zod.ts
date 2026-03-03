@@ -109,6 +109,14 @@ export const PresetDtoSchema = z.object({
   colorHex: z.string(),
   description: z.string().nullable(),
   thumbnailUrl: z.string().url().nullable(),
+  gcodeMeta: z
+    .object({
+      estimated_time_sec: z.number().nullable(),
+      gcode_nozzle_diameter: z.number().nullable(),
+      filament_type: z.string().nullable(),
+      filament_name: z.string().nullable(),
+    })
+    .nullable(),
   compatibilityRules: PresetCompatibilityRulesDtoSchema,
 });
 

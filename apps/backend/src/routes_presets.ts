@@ -37,6 +37,10 @@ function presetToDto(p: any) {
     colorHex: p.colorHex,
     description: p.description ?? null,
     thumbnailUrl: p.thumbnailPath ? `/api/presets/${p.id}/thumbnail` : null,
+    gcodeMeta:
+      p.gcodeMeta && typeof p.gcodeMeta === 'object'
+        ? (p.gcodeMeta as any)
+        : null,
     compatibilityRules: {
       allowedModelIds: (p.allowedModels ?? []).map((x: any) => x.modelId),
       allowedNozzleDiameters: Array.isArray(

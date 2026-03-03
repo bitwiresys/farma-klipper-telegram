@@ -45,6 +45,13 @@ export type PresetCompatibilityDto = {
   reasons: CompatibilityReason[];
 };
 
+export type PresetGcodeMetaDto = {
+  estimated_time_sec: number | null;
+  gcode_nozzle_diameter: number | null;
+  filament_type: string | null;
+  filament_name: string | null;
+};
+
 export type PresetDto = {
   id: string;
   title: string;
@@ -52,6 +59,7 @@ export type PresetDto = {
   colorHex: string;
   description: string | null;
   thumbnailUrl: string | null;
+  gcodeMeta: PresetGcodeMetaDto | null;
   compatibilityRules: PresetCompatibilityRulesDto;
 };
 
