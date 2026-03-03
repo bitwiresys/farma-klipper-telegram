@@ -56,6 +56,12 @@ function strOrNull(x: unknown): string | null {
   return x;
 }
 
+function arrNumAtOrNull(x: unknown, idx: number): number | null {
+  if (!Array.isArray(x)) return null;
+  const v = x[idx];
+  return numOrNull(v);
+}
+
 function normalizePrinterState(raw: string | null): PrinterState {
   const s = (raw ?? '').toLowerCase();
   if (s === 'printing') return PrinterState.printing;
@@ -84,6 +90,10 @@ function computeSnapshotFromStatus(raw: RawStatus): {
   const ds = (raw.display_status ?? {}) as Record<string, unknown>;
   const ext = (raw.extruder ?? {}) as Record<string, unknown>;
   const bed = (raw.heater_bed ?? {}) as Record<string, unknown>;
+  const th = (raw.toolhead ?? {}) as Record<string, unknown>;
+  const gm = (raw.gcode_move ?? {}) as Record<string, unknown>;
+  const mr = (raw.motion_report ?? {}) as Record<string, unknown>;
+  const fan = (raw.fan ?? {}) as Record<string, unknown>;
 
   const state = normalizePrinterState(strOrNull(ps.state));
 
@@ -105,6 +115,57 @@ function computeSnapshotFromStatus(raw: RawStatus): {
     total: numOrNull((ps as any)?.info?.total_layer) ?? null,
   };
 
+  const commanded = {
+    x: arrNumAtOrNull(th.position, 0),
+    y: arrNumAtOrNull(th.position, 1),
+    z: arrNumAtOrNull(th.position, 2),
+    e: arrNumAtOrNull(th.position, 3),
+  };
+
+  const live = {
+    x: arrNumAtOrNull(mr.live_position, 0),
+    y: arrNumAtOrNull(mr.live_position, 1),
+    z: arrNumAtOrNull(mr.live_position, 2),
+    e: arrNumAtOrNull(mr.live_position, 3),
+  };
+
+  const gcode = {
+    x: arrNumAtOrNull(gm.gcode_position, 0),
+    y: arrNumAtOrNull(gm.gcode_position, 1),
+    z: arrNumAtOrNull(gm.gcode_position, 2),
+    e: arrNumAtOrNull(gm.gcode_position, 3),
+  };
+
+  const liveVelocityMmS = numOrNull(mr.live_velocity);
+  const gcodeSpeedMmS = numOrNull(gm.speed);
+  const speedFactor = numOrNull(gm.speed_factor);
+  const flowFactor = numOrNull(gm.extrude_factor);
+
+  const fanSpeed = numOrNull(fan.speed);
+  const fanRpm = numOrNull((fan as any).rpm);
+
+  let chamberTemp: number | null = null;
+  try {
+    for (const [k, v] of Object.entries(raw)) {
+      const key = String(k).toLowerCase();
+      if (!key.startsWith('temperature_sensor') && !key.includes('chamber'))
+        continue;
+      if (!v || typeof v !== 'object') continue;
+      const t = numOrNull((v as any).temperature);
+      if (t !== null) {
+        chamberTemp = t;
+        break;
+      }
+    }
+  } catch {
+    // ignore
+  }
+
+  const limits = {
+    maxVelocity: numOrNull((th as any).max_velocity),
+    maxAccel: numOrNull((th as any).max_accel),
+  };
+
   return {
     snapshot: {
       state,
@@ -113,9 +174,32 @@ function computeSnapshotFromStatus(raw: RawStatus): {
       etaSec: null,
       temps,
       layers,
+      position: {
+        commanded,
+        live,
+        gcode,
+      },
+      speed: {
+        liveVelocityMmS,
+        gcodeSpeedMmS,
+        speedFactor,
+        flowFactor,
+      },
+      fans: {
+        part: {
+          speed: fanSpeed,
+          rpm: fanRpm,
+        },
+      },
+      chamberTemp,
+      limits,
     },
     printDurationSec,
   };
+}
+
+export function __computeSnapshotFromStatusForTest(raw: RawStatus) {
+  return computeSnapshotFromStatus(raw);
 }
 
 export class PrinterRuntimeManager {

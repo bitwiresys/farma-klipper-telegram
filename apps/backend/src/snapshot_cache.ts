@@ -21,6 +21,28 @@ const DEFAULT_SNAPSHOT: PrinterSnapshotDto = {
     current: null,
     total: null,
   },
+  position: {
+    commanded: { x: null, y: null, z: null, e: null },
+    live: { x: null, y: null, z: null, e: null },
+    gcode: { x: null, y: null, z: null, e: null },
+  },
+  speed: {
+    liveVelocityMmS: null,
+    gcodeSpeedMmS: null,
+    speedFactor: null,
+    flowFactor: null,
+  },
+  fans: {
+    part: {
+      speed: null,
+      rpm: null,
+    },
+  },
+  chamberTemp: null,
+  limits: {
+    maxVelocity: null,
+    maxAccel: null,
+  },
 };
 
 export class SnapshotCache {

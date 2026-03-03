@@ -1,6 +1,7 @@
 import WebSocket from 'ws';
 
 import { logger } from './logger.js';
+import { MoonrakerHttp } from './moonraker_http.js';
 
 export type MoonrakerWsCallbacks = {
   onStatusUpdate: (diff: unknown) => void;
@@ -48,6 +49,7 @@ export class MoonrakerWsConnector {
   private connectionId: string | null = null;
   private gcodeRing: string[] = [];
   private gcodeRingMax = 200;
+  private extraSubscribedObjects: string[] = [];
 
   constructor(opts: MoonrakerWsConnectorOptions) {
     if (!opts.apiKey.trim()) {
@@ -186,6 +188,9 @@ export class MoonrakerWsConnector {
         webhooks: null,
         extruder: null,
         heater_bed: null,
+        gcode_move: null,
+        motion_report: null,
+        fan: null,
       },
     });
 
@@ -193,6 +198,42 @@ export class MoonrakerWsConnector {
       { printerId: this.opts.printerId },
       'moonraker ws subscribe ok',
     );
+
+    this.extraSubscribedObjects = [];
+    try {
+      const http = new MoonrakerHttp({
+        baseUrl: this.opts.baseUrl,
+        apiKey: this.opts.apiKey,
+      });
+
+      const res = await http.get<any>('/printer/objects/list');
+      const objects =
+        (res as any)?.result?.objects ?? (res as any)?.objects ?? ([] as any[]);
+      const list = Array.isArray(objects) ? objects.map(String) : [];
+
+      const candidates = list.filter((k) => {
+        const s = String(k).toLowerCase();
+        return s.startsWith('temperature_sensor') || s.includes('chamber');
+      });
+
+      const unique = Array.from(new Set(candidates)).slice(0, 12);
+      if (unique.length > 0) {
+        await this.sendRpc('printer.objects.subscribe', {
+          objects: Object.fromEntries(unique.map((k) => [k, null])),
+        });
+        this.extraSubscribedObjects = unique;
+        logger.info(
+          { printerId: this.opts.printerId, objects: unique },
+          'moonraker ws extra subscribe ok',
+        );
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      logger.warn(
+        { printerId: this.opts.printerId, err: msg },
+        'moonraker ws chamber sensor discovery/subscribe failed',
+      );
+    }
 
     let gotFirstStatus = false;
 

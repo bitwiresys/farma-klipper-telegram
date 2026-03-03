@@ -17,6 +17,43 @@ export type PrinterSnapshotDto = {
     current: number | null;
     total: number | null;
   };
+  position?: {
+    commanded?: {
+      x: number | null;
+      y: number | null;
+      z: number | null;
+      e: number | null;
+    };
+    live?: {
+      x: number | null;
+      y: number | null;
+      z: number | null;
+      e: number | null;
+    };
+    gcode?: {
+      x: number | null;
+      y: number | null;
+      z: number | null;
+      e: number | null;
+    };
+  };
+  speed?: {
+    liveVelocityMmS?: number | null;
+    gcodeSpeedMmS?: number | null;
+    speedFactor?: number | null;
+    flowFactor?: number | null;
+  };
+  fans?: {
+    part?: {
+      speed?: number | null;
+      rpm?: number | null;
+    };
+  };
+  chamberTemp?: number | null;
+  limits?: {
+    maxVelocity?: number | null;
+    maxAccel?: number | null;
+  };
 };
 
 export type PrinterDto = {

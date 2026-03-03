@@ -72,6 +72,59 @@ export const PrinterSnapshotSchema = z.object({
     current: z.number().int().min(0).nullable(),
     total: z.number().int().min(0).nullable(),
   }),
+  position: z
+    .object({
+      commanded: z
+        .object({
+          x: z.number().nullable(),
+          y: z.number().nullable(),
+          z: z.number().nullable(),
+          e: z.number().nullable(),
+        })
+        .optional(),
+      live: z
+        .object({
+          x: z.number().nullable(),
+          y: z.number().nullable(),
+          z: z.number().nullable(),
+          e: z.number().nullable(),
+        })
+        .optional(),
+      gcode: z
+        .object({
+          x: z.number().nullable(),
+          y: z.number().nullable(),
+          z: z.number().nullable(),
+          e: z.number().nullable(),
+        })
+        .optional(),
+    })
+    .optional(),
+  speed: z
+    .object({
+      liveVelocityMmS: z.number().nullable().optional(),
+      gcodeSpeedMmS: z.number().nullable().optional(),
+      speedFactor: z.number().nullable().optional(),
+      flowFactor: z.number().nullable().optional(),
+    })
+    .optional(),
+  fans: z
+    .object({
+      part: z
+        .object({
+          speed: z.number().nullable().optional(),
+          rpm: z.number().nullable().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
+  chamberTemp: z.number().nullable().optional(),
+  limits: z
+    .object({
+      maxVelocity: z.number().nullable().optional(),
+      maxAccel: z.number().nullable().optional(),
+    })
+    .optional(),
 });
 
 export const PrinterDtoSchema = z

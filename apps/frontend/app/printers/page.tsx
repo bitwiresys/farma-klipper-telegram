@@ -8,6 +8,27 @@ import { AppShell } from '../components/AppShell';
 import { useAuth } from '../auth/auth_context';
 import { apiRequest } from '../lib/api';
 
+function fmtNum(x: number | null | undefined, digits = 1): string {
+  if (x === null || x === undefined) return '-';
+  const p = Math.pow(10, digits);
+  return String(Math.round(x * p) / p);
+}
+
+function fmtPct01(x: number | null | undefined): string {
+  if (x === null || x === undefined) return '-';
+  return `${Math.round(x * 100)}%`;
+}
+
+function fmtXYZ(p?: {
+  x: number | null;
+  y: number | null;
+  z: number | null;
+  e: number | null;
+}): string {
+  if (!p) return '-';
+  return `X ${fmtNum(p.x, 2)} Y ${fmtNum(p.y, 2)} Z ${fmtNum(p.z, 2)}`;
+}
+
 export default function PrintersPage() {
   const { token } = useAuth();
   const [err, setErr] = useState<string | null>(null);
@@ -271,6 +292,48 @@ export default function PrintersPage() {
                     </button>
                   </div>
                 )}
+
+                <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
+                  <div className="rounded bg-slate-950 p-2">
+                    <div className="text-slate-400">XYZ live</div>
+                    <div>{fmtXYZ(p.snapshot.position?.live)}</div>
+                  </div>
+                  <div className="rounded bg-slate-950 p-2">
+                    <div className="text-slate-400">XYZ cmd</div>
+                    <div>{fmtXYZ(p.snapshot.position?.commanded)}</div>
+                  </div>
+                  <div className="rounded bg-slate-950 p-2">
+                    <div className="text-slate-400">speed</div>
+                    <div>
+                      v {fmtNum(p.snapshot.speed?.liveVelocityMmS, 1)} / g{' '}
+                      {fmtNum(p.snapshot.speed?.gcodeSpeedMmS, 1)} mm/s
+                    </div>
+                    <div className="text-slate-400">
+                      factor {fmtPct01(p.snapshot.speed?.speedFactor)}
+                    </div>
+                  </div>
+                  <div className="rounded bg-slate-950 p-2">
+                    <div className="text-slate-400">flow / fan</div>
+                    <div>flow {fmtPct01(p.snapshot.speed?.flowFactor)}</div>
+                    <div>
+                      fan {fmtPct01(p.snapshot.fans?.part?.speed)}
+                      {p.snapshot.fans?.part?.rpm !== null &&
+                        p.snapshot.fans?.part?.rpm !== undefined &&
+                        ` (${fmtNum(p.snapshot.fans?.part?.rpm, 0)} rpm)`}
+                    </div>
+                  </div>
+                  <div className="rounded bg-slate-950 p-2">
+                    <div className="text-slate-400">chamber</div>
+                    <div>{fmtNum(p.snapshot.chamberTemp, 1)}</div>
+                  </div>
+                  <div className="rounded bg-slate-950 p-2">
+                    <div className="text-slate-400">limits</div>
+                    <div>
+                      v {fmtNum(p.snapshot.limits?.maxVelocity, 0)} a{' '}
+                      {fmtNum(p.snapshot.limits?.maxAccel, 0)}
+                    </div>
+                  </div>
+                </div>
               </div>
             ))}
             {printers.length === 0 && (
