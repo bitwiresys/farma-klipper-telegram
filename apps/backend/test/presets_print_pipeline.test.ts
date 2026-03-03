@@ -230,11 +230,25 @@ describe('presets print pipeline (integration)', () => {
       'metascan',
       'metadata',
       'thumbnails',
+      'download',
       'print_start',
     ]);
 
     const startCall = mock.calls.find((c) => c.kind === 'print_start') as any;
     expect(String(startCall.filename)).toContain(`tg_presets/${presetId}/`);
+
+    const updated = await prisma.preset.findUnique({ where: { id: presetId } });
+    expect(updated?.thumbnailPath).toBeTruthy();
+
+    const thumbRes = await app.inject({
+      method: 'GET',
+      url: `/api/presets/${presetId}/thumbnail`,
+      headers: {
+        authorization: `Bearer ${token}`,
+      },
+    });
+    expect(thumbRes.statusCode).toBe(200);
+    expect(thumbRes.body).toContain('BIG_THUMB');
   });
 
   it('2) compatibility blocks: reasons[] and no upload/start', async () => {

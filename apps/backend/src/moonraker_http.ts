@@ -45,6 +45,29 @@ async function fetchJson<T>(
   }
 }
 
+async function fetchBytes(
+  url: string,
+  init: RequestInit,
+  timeoutMs: number,
+): Promise<Buffer> {
+  const ac = new AbortController();
+  const t = setTimeout(() => ac.abort(), timeoutMs);
+
+  try {
+    const res = await fetch(url, { ...init, signal: ac.signal });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(
+        `Moonraker HTTP ${res.status} ${res.statusText}: ${text.slice(0, 500)}`,
+      );
+    }
+    const ab = await res.arrayBuffer();
+    return Buffer.from(ab);
+  } finally {
+    clearTimeout(t);
+  }
+}
+
 export class MoonrakerHttp {
   private baseUrl: string;
   private apiKey: string;
@@ -143,6 +166,29 @@ export class MoonrakerHttp {
         body: form as any,
       },
       init?.timeoutMs ?? 30_000,
+    );
+  }
+
+  async downloadFile(
+    opts: { root: string; filename: string },
+    init?: MoonrakerRequestInit,
+  ): Promise<Buffer> {
+    const root = String(opts.root).trim();
+    const filename = String(opts.filename).replace(/^\/+/, '');
+    const url = `${this.baseUrl}/server/files/${encodeURIComponent(root)}/${filename
+      .split('/')
+      .map((p) => encodeURIComponent(p))
+      .join('/')}`;
+
+    logger.debug({ url }, 'moonraker http download');
+
+    return fetchBytes(
+      url,
+      {
+        method: 'GET',
+        headers: this.headersAuthOnly(),
+      },
+      init?.timeoutMs ?? 15_000,
     );
   }
 }

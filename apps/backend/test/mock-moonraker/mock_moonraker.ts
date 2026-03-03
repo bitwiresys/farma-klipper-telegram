@@ -14,6 +14,7 @@ export type MockMoonrakerCall =
   | { kind: 'metascan'; filename: string }
   | { kind: 'metadata'; filename: string }
   | { kind: 'thumbnails'; filename: string }
+  | { kind: 'download'; root: string; filename: string }
   | { kind: 'print_start'; filename: string };
 
 export type MockMoonrakerControls = {
@@ -169,6 +170,9 @@ export async function startMockMoonraker(opts?: {
     return reply.send({
       filename,
       estimated_time: 123,
+      nozzle_diameter: 0.4,
+      filament_type: 'PLA',
+      filament_name: 'Test PLA',
       size: 100,
       thumbnails: [
         {
@@ -187,16 +191,45 @@ export async function startMockMoonraker(opts?: {
     const filename = String((req.query as any)?.filename ?? '');
     calls.push({ kind: 'thumbnails', filename });
 
-    return reply.send({
-      thumbnails: [
-        {
-          width: 100,
-          height: 100,
-          size: 10,
-          relative_path: 'thumbs/100.png',
-        },
-      ],
-    });
+    return reply.send([
+      {
+        width: 100,
+        height: 100,
+        size: 10,
+        thumbnail_path: 'test/.thumbs/small.png',
+      },
+      {
+        width: 500,
+        height: 500,
+        size: 20,
+        thumbnail_path: 'test/.thumbs/big.png',
+      },
+    ]);
+  });
+
+  app.get('/server/files/:root/*', async (req, reply) => {
+    if (delayMs > 0) await new Promise((r) => setTimeout(r, delayMs));
+
+    const root = String((req.params as any).root ?? '');
+    const filename = String((req.params as any)['*'] ?? '');
+
+    calls.push({ kind: 'download', root, filename });
+
+    if (root === 'gcodes' && filename === 'test/.thumbs/small.png') {
+      reply.header('content-type', 'image/png');
+      return reply.send(Buffer.from('SMALL_THUMB', 'utf8'));
+    }
+    if (root === 'gcodes' && filename === 'test/.thumbs/big.png') {
+      reply.header('content-type', 'image/png');
+      return reply.send(Buffer.from('BIG_THUMB', 'utf8'));
+    }
+
+    const key = [root, filename].filter(Boolean).join('/');
+    const found = files.get(key);
+    if (!found) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+    reply.header('content-type', 'application/octet-stream');
+    return reply.send(found);
   });
 
   app.post('/printer/print/start', async (req, reply) => {

@@ -15,6 +15,7 @@ import { wsHub } from './ws_hub.js';
 import { MoonrakerHttp } from './moonraker_http.js';
 import { printerRuntime } from './printer_runtime.js';
 import { decryptApiKey } from './crypto_api_key.js';
+import { presetMetaService } from './preset_meta_service.js';
 
 function ensureDir(p: string) {
   fs.mkdirSync(p, { recursive: true });
@@ -344,15 +345,12 @@ export async function registerPresetsRoutes(app: FastifyInstance) {
         checksumSha256: checksum,
       });
 
-      await http.post(
-        `/server/files/metascan?filename=${encodeURIComponent(remoteFilename)}`,
-      );
-      await http.get(
-        `/server/files/metadata?filename=${encodeURIComponent(remoteFilename)}`,
-      );
-      await http.get(
-        `/server/files/thumbnails?filename=${encodeURIComponent(remoteFilename)}`,
-      );
+      await presetMetaService.ensureMetaAndThumbnail({
+        presetId,
+        printerId: printer.id,
+        remoteFilename,
+        http,
+      });
       await http.post('/printer/print/start', { filename: remoteFilename });
     });
 
