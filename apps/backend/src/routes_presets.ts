@@ -119,7 +119,7 @@ export async function registerPresetsRoutes(app: FastifyInstance) {
 
     for await (const part of parts) {
       if (part.type === 'file') {
-        if (part.fieldname !== 'gcode') continue;
+        if (part.fieldname !== 'gcode' && part.fieldname !== 'file') continue;
         fileName = part.filename;
         fileBuf = await part.toBuffer();
       } else {
@@ -128,7 +128,7 @@ export async function registerPresetsRoutes(app: FastifyInstance) {
       }
     }
 
-    if (!fileBuf) return reply.code(400).send({ error: 'BAD_REQUEST', message: 'gcode file is required (field: gcode)' });
+    if (!fileBuf) return reply.code(400).send({ error: 'BAD_REQUEST', message: 'gcode file is required (field: gcode or file)' });
     if (!fileName) return reply.code(400).send({ error: 'BAD_REQUEST', message: 'gcode filename missing' });
     if (!isSafeFilename(fileName)) {
       return reply.code(400).send({ error: 'BAD_REQUEST', message: 'invalid gcode filename' });
