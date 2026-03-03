@@ -18,6 +18,7 @@ export default function SettingsPage() {
   const { token } = useAuth();
   const [health, setHealth] = useState<string>('(not pinged)');
   const [backendStatus, setBackendStatus] = useState<string>('(not loaded)');
+  const [securityInfo, setSecurityInfo] = useState<string>('(not loaded)');
   const [notif, setNotif] = useState<NotificationsSettings | null>(null);
   const [notifErr, setNotifErr] = useState<string | null>(null);
 
@@ -30,6 +31,16 @@ export default function SettingsPage() {
       setHealth(JSON.stringify(res));
     } catch (e) {
       setHealth(e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  const loadSecurity = async () => {
+    if (!token) return;
+    try {
+      const res = await apiRequest('/api/security', { token });
+      setSecurityInfo(JSON.stringify(res));
+    } catch (e) {
+      setSecurityInfo(e instanceof Error ? e.message : String(e));
     }
   };
 
@@ -195,6 +206,20 @@ export default function SettingsPage() {
 
           <div className="mt-3 rounded bg-slate-950 p-3 font-mono text-xs">
             {backendStatus}
+          </div>
+
+          <div className="mt-4 text-slate-400">Security</div>
+          <div className="mt-2 flex gap-2">
+            <button
+              className="flex-1 rounded bg-slate-950 px-3 py-2 text-xs"
+              onClick={() => void loadSecurity()}
+            >
+              Load /api/security
+            </button>
+          </div>
+
+          <div className="mt-3 rounded bg-slate-950 p-3 font-mono text-xs">
+            {securityInfo}
           </div>
         </div>
       </div>

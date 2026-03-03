@@ -27,6 +27,7 @@ function isProtectedApiRoute(method: string, pathname: string): boolean {
   if (m === 'POST' && pathname === '/api/printer-models') return true;
   if (m === 'GET' && pathname === '/api/history') return true;
   if (m === 'GET' && pathname === '/api/status') return true;
+  if (m === 'GET' && pathname === '/api/security') return true;
 
   if (m === 'GET' && pathname === '/api/presets') return true;
   if (m === 'POST' && pathname === '/api/presets') return true;

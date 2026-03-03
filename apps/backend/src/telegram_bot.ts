@@ -73,6 +73,56 @@ export function startTelegramBot() {
     await ctx.reply(text);
   });
 
+  bot.command('mute', async (ctx) => {
+    const telegramUserId = String(ctx.from?.id ?? '');
+    const chatId = String(ctx.chat?.id ?? '');
+    if (!telegramUserId) return;
+    const allowed = getAllowedTelegramUserIds();
+    const isAllowed =
+      allowed.size === 0 ? true : allowed.has(Number(telegramUserId));
+    if (!isAllowed) {
+      await ctx.reply('Not allowed');
+      return;
+    }
+
+    await prisma.user.upsert({
+      where: { telegramId: telegramUserId },
+      create: {
+        telegramId: telegramUserId,
+        chatId: chatId || null,
+        isAllowed: true,
+        notificationsEnabled: false,
+      },
+      update: { notificationsEnabled: false },
+    });
+    await ctx.reply('Notifications muted');
+  });
+
+  bot.command('unmute', async (ctx) => {
+    const telegramUserId = String(ctx.from?.id ?? '');
+    const chatId = String(ctx.chat?.id ?? '');
+    if (!telegramUserId) return;
+    const allowed = getAllowedTelegramUserIds();
+    const isAllowed =
+      allowed.size === 0 ? true : allowed.has(Number(telegramUserId));
+    if (!isAllowed) {
+      await ctx.reply('Not allowed');
+      return;
+    }
+
+    await prisma.user.upsert({
+      where: { telegramId: telegramUserId },
+      create: {
+        telegramId: telegramUserId,
+        chatId: chatId || null,
+        isAllowed: true,
+        notificationsEnabled: true,
+      },
+      update: { notificationsEnabled: true },
+    });
+    await ctx.reply('Notifications enabled');
+  });
+
   bot.launch().then(() => {
     logger.info('telegram bot launched');
   });
