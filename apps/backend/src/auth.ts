@@ -17,7 +17,7 @@ function unauthorized(reply: FastifyReply, message = 'UNAUTHORIZED') {
 }
 
 export function registerAuthMiddleware(app: FastifyInstance) {
-  app.addHook('onRequest', async (req, reply) => {
+  app.addHook('preHandler', async (req, reply) => {
     const pathname = req.url.split('?')[0] ?? '';
 
     if (!pathname.startsWith('/api/')) return;
