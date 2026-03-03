@@ -45,6 +45,11 @@ async function main() {
 
   await printerRuntime.initFromDb();
 
+  // Iteration 4: periodic history backfill in case realtime events were missed
+  setInterval(() => {
+    void printerRuntime.backfillHistoryForAllPrinters({ limit: 50 });
+  }, 5 * 60_000);
+
   app.addHook('onClose', async () => {
     await prisma.$disconnect();
   });

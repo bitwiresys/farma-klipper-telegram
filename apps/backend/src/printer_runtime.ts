@@ -311,7 +311,112 @@ export class PrinterRuntimeManager {
   async initFromDb() {
     const printers = await prisma.printer.findMany();
     for (const p of printers) {
+      this.cache.get(p.id);
       await this.ensureConnector(p.id);
+    }
+  }
+
+  async backfillHistoryForPrinter(
+    printerId: string,
+    opts?: { limit?: number },
+  ) {
+    const limit = Math.min(200, Math.max(1, Math.floor(opts?.limit ?? 50)));
+
+    let baseUrl: string;
+    let apiKey: string;
+    try {
+      const s = await this.getPrinterSecrets(printerId);
+      baseUrl = s.baseUrl;
+      apiKey = s.apiKey;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (msg === 'PRINTER_NEEDS_REKEY') return;
+      throw e;
+    }
+
+    const http = new MoonrakerHttp({ baseUrl, apiKey });
+    const res = await http.get<any>(`/server/history/list?limit=${limit}`);
+    const jobs: any[] = Array.isArray(res?.result?.jobs)
+      ? res.result.jobs
+      : Array.isArray(res?.jobs)
+        ? res.jobs
+        : [];
+
+    for (const j of jobs) {
+      const filename = strOrNull(j?.filename) ?? 'unknown';
+      const status = normalizeHistoryStatus(String(j?.status ?? 'changed'));
+      const startTimeSec = numOrNull(j?.start_time);
+      const endTimeSec = numOrNull(j?.end_time);
+
+      const startedAt = startTimeSec
+        ? new Date(Math.floor(startTimeSec) * 1000)
+        : new Date();
+      const endedAt = endTimeSec
+        ? new Date(Math.floor(endTimeSec) * 1000)
+        : status === HistoryStatus.in_progress
+          ? null
+          : new Date();
+
+      const printDurationSec = numOrNull(j?.print_duration);
+      const totalDurationSec = numOrNull(j?.total_duration);
+      const filamentUsedMm = numOrNull(j?.filament_used);
+      const errorMessage = strOrNull(j?.message) ?? strOrNull(j?.error) ?? null;
+
+      const computedSessionId = startTimeSec
+        ? `${printerId}:${filename}:${Math.floor(startTimeSec)}`
+        : null;
+
+      const existing = computedSessionId
+        ? await prisma.printHistory.findFirst({
+            where: { printerId, printSessionId: computedSessionId },
+          })
+        : await prisma.printHistory.findFirst({
+            where: { printerId, filename, startedAt },
+          });
+
+      if (existing) {
+        await prisma.printHistory.update({
+          where: { id: existing.id },
+          data: {
+            filename,
+            status,
+            startedAt,
+            endedAt,
+            printDurationSec,
+            totalDurationSec,
+            filamentUsedMm,
+            errorMessage,
+            printSessionId: computedSessionId ?? existing.printSessionId,
+          },
+        });
+      } else {
+        await prisma.printHistory.create({
+          data: {
+            printerId,
+            printSessionId: computedSessionId,
+            filename,
+            status,
+            startedAt,
+            endedAt,
+            printDurationSec,
+            totalDurationSec,
+            filamentUsedMm,
+            errorMessage,
+          },
+        });
+      }
+    }
+  }
+
+  async backfillHistoryForAllPrinters(opts?: { limit?: number }) {
+    const printers = await prisma.printer.findMany({ select: { id: true } });
+    for (const p of printers) {
+      try {
+        await this.backfillHistoryForPrinter(p.id, opts);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        logger.warn({ printerId: p.id, err: msg }, 'history backfill failed');
+      }
     }
   }
 
@@ -474,6 +579,24 @@ export class PrinterRuntimeManager {
             printSessionId = computed;
           }
 
+          const job = (payload as any)?.job ?? null;
+          const startTimeSec = numOrNull(job?.start_time);
+          const endTimeSec = numOrNull(job?.end_time);
+          const printDurationSec = numOrNull(job?.print_duration);
+          const totalDurationSec = numOrNull(job?.total_duration);
+          const filamentUsedMm = numOrNull(job?.filament_used);
+          const errorMessage =
+            strOrNull(job?.message) ?? strOrNull(job?.error) ?? null;
+
+          const startedAt = startTimeSec
+            ? new Date(Math.floor(startTimeSec) * 1000)
+            : now;
+          const endedAt = endTimeSec
+            ? new Date(Math.floor(endTimeSec) * 1000)
+            : status === HistoryStatus.in_progress
+              ? null
+              : now;
+
           const existing =
             printSessionId === null
               ? null
@@ -490,7 +613,12 @@ export class PrinterRuntimeManager {
                 data: {
                   filename,
                   status,
-                  endedAt: null,
+                  startedAt,
+                  endedAt,
+                  printDurationSec,
+                  totalDurationSec,
+                  filamentUsedMm,
+                  errorMessage,
                 },
               })
             : await prisma.printHistory.create({
@@ -499,12 +627,12 @@ export class PrinterRuntimeManager {
                   printSessionId,
                   filename,
                   status,
-                  startedAt: now,
-                  endedAt: null,
-                  printDurationSec: null,
-                  totalDurationSec: null,
-                  filamentUsedMm: null,
-                  errorMessage: null,
+                  startedAt,
+                  endedAt,
+                  printDurationSec,
+                  totalDurationSec,
+                  filamentUsedMm,
+                  errorMessage,
                 },
               });
 
@@ -520,6 +648,14 @@ export class PrinterRuntimeManager {
             filamentUsedMm: saved.filamentUsedMm,
             errorMessage: saved.errorMessage,
           });
+
+          if (
+            status === HistoryStatus.completed ||
+            status === HistoryStatus.error ||
+            status === HistoryStatus.cancelled
+          ) {
+            await this.clearPrintSession(printerId);
+          }
         },
         onGcodeResponse: (line) => {
           this.onGcodeLine?.(printerId, line);
