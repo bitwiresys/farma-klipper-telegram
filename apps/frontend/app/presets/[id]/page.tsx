@@ -4,16 +4,13 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 
-import {
-  computePresetCompatibilityReasons,
-  type CompatibilityReason,
-} from '@farma/shared';
+import { computePresetCompatibilityReasons } from '../../lib/compatibility';
 
 import { AppShell } from '../../components/AppShell';
 import { useAuth } from '../../auth/auth_context';
 import { apiRequest, tryParseApiErrorBody, type ApiError } from '../../lib/api';
 import { connectBackendWs } from '../../lib/ws';
-import type { PresetDto, PrinterDto } from '../../lib/dto';
+import type { CompatibilityReason, PresetDto, PrinterDto } from '../../lib/dto';
 
 type WsEvent = { type: string; payload: any };
 

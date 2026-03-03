@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 
-import { CreatePresetSchema } from '@farma/shared';
+import { CreatePresetSchema } from '../../lib/schemas';
 
 import { AppShell } from '../../components/AppShell';
 import { useAuth } from '../../auth/auth_context';
