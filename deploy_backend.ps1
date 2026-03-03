@@ -22,7 +22,18 @@ function Invoke-Remote([string]$Cmd, [switch]$Sudo) {
 }
 
 Invoke-Remote "set -e; cd $RepoDir; git rev-parse --is-inside-work-tree >/dev/null" 
-Invoke-Remote "set -e; cd $RepoDir; git fetch --all --prune; git pull --ff-only" 
+
+# transient GitHub/HTTP errors happen; retry fetch/pull a few times
+$maxGitAttempts = 5
+for ($i = 1; $i -le $maxGitAttempts; $i++) {
+  try {
+    Invoke-Remote "set -e; cd $RepoDir; git config http.postBuffer 524288000; git config http.version HTTP/1.1; git fetch --all --prune; git pull --ff-only" 
+    break
+  } catch {
+    if ($i -eq $maxGitAttempts) { throw }
+    Start-Sleep -Seconds (3 * $i)
+  }
+}
 
 if (-not $SkipInstall) {
   Invoke-Remote "set -e; cd $RepoDir; pnpm install" 
