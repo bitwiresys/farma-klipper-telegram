@@ -1,4 +1,8 @@
-import type { CompatibilityReason, HistoryStatus, PrinterState } from './enums.js';
+import type {
+  CompatibilityReason,
+  HistoryStatus,
+  PrinterState,
+} from './enums.js';
 
 export type PrinterSnapshotDto = {
   state: PrinterState;

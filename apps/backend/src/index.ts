@@ -16,13 +16,16 @@ async function main() {
   });
 
   try {
-    await app.listen({ port: env.PORT, host: '0.0.0.0' }, (err: Error | null, address: string) => {
-      if (err) {
-        logger.error(err, 'failed to start');
-        process.exit(1);
-      }
-      logger.info({ address }, 'listening');
-    });
+    await app.listen(
+      { port: env.PORT, host: '0.0.0.0' },
+      (err: Error | null, address: string) => {
+        if (err) {
+          logger.error(err, 'failed to start');
+          process.exit(1);
+        }
+        logger.info({ address }, 'listening');
+      },
+    );
   } catch (e) {
     logger.error(e);
     process.exit(1);

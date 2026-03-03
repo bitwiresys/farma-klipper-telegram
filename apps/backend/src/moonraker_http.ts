@@ -15,7 +15,11 @@ function normalizeBaseUrl(raw: string): string {
   return url;
 }
 
-async function fetchJson<T>(url: string, init: RequestInit, timeoutMs: number): Promise<T> {
+async function fetchJson<T>(
+  url: string,
+  init: RequestInit,
+  timeoutMs: number,
+): Promise<T> {
   const ac = new AbortController();
   const t = setTimeout(() => ac.abort(), timeoutMs);
 
@@ -23,7 +27,9 @@ async function fetchJson<T>(url: string, init: RequestInit, timeoutMs: number): 
     const res = await fetch(url, { ...init, signal: ac.signal });
     const text = await res.text();
     if (!res.ok) {
-      throw new Error(`Moonraker HTTP ${res.status} ${res.statusText}: ${text.slice(0, 500)}`);
+      throw new Error(
+        `Moonraker HTTP ${res.status} ${res.statusText}: ${text.slice(0, 500)}`,
+      );
     }
     return text ? (JSON.parse(text) as T) : ({} as T);
   } finally {
@@ -63,7 +69,11 @@ export class MoonrakerHttp {
     );
   }
 
-  async post<T>(path: string, body?: unknown, init?: MoonrakerRequestInit): Promise<T> {
+  async post<T>(
+    path: string,
+    body?: unknown,
+    init?: MoonrakerRequestInit,
+  ): Promise<T> {
     const url = `${this.baseUrl}${path}`;
     logger.debug({ url }, 'moonraker http post');
     return fetchJson<T>(
@@ -77,7 +87,10 @@ export class MoonrakerHttp {
     );
   }
 
-  async queryObjects<T = unknown>(objects: string[], init?: MoonrakerRequestInit): Promise<T> {
+  async queryObjects<T = unknown>(
+    objects: string[],
+    init?: MoonrakerRequestInit,
+  ): Promise<T> {
     return this.post<T>(
       '/printer/objects/query',
       {

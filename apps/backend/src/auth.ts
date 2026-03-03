@@ -29,10 +29,13 @@ function isProtectedApiRoute(method: string, pathname: string): boolean {
 
   if (m === 'PATCH' && /^\/api\/printers\/[^/]+$/.test(pathname)) return true;
   if (m === 'DELETE' && /^\/api\/printers\/[^/]+$/.test(pathname)) return true;
-  if (m === 'POST' && /^\/api\/printers\/[^/]+\/(test|rescan)$/.test(pathname)) return true;
+  if (m === 'POST' && /^\/api\/printers\/[^/]+\/(test|rescan)$/.test(pathname))
+    return true;
 
-  if (m === 'PATCH' && /^\/api\/printer-models\/[^/]+$/.test(pathname)) return true;
-  if (m === 'DELETE' && /^\/api\/printer-models\/[^/]+$/.test(pathname)) return true;
+  if (m === 'PATCH' && /^\/api\/printer-models\/[^/]+$/.test(pathname))
+    return true;
+  if (m === 'DELETE' && /^\/api\/printer-models\/[^/]+$/.test(pathname))
+    return true;
 
   return false;
 }
@@ -58,14 +61,19 @@ export function registerAuthMiddleware(app: FastifyInstance) {
     const token = m[1];
 
     try {
-      const payload = jwt.verify(token, env.JWT_SECRET, { algorithms: ['HS256'] });
-      if (!payload || typeof payload !== 'object') return unauthorized(reply, 'Invalid token');
+      const payload = jwt.verify(token, env.JWT_SECRET, {
+        algorithms: ['HS256'],
+      });
+      if (!payload || typeof payload !== 'object')
+        return unauthorized(reply, 'Invalid token');
 
       const sub = (payload as { sub?: unknown }).sub;
-      if (typeof sub !== 'string' || !sub) return unauthorized(reply, 'Invalid token subject');
+      if (typeof sub !== 'string' || !sub)
+        return unauthorized(reply, 'Invalid token subject');
 
       const user = await prisma.user.findUnique({ where: { telegramId: sub } });
-      if (!user || !user.isAllowed) return unauthorized(reply, 'User is not allowed');
+      if (!user || !user.isAllowed)
+        return unauthorized(reply, 'User is not allowed');
 
       req.auth = { telegramId: sub };
     } catch (e) {

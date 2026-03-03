@@ -14,7 +14,9 @@ function NavItem({ href, label }: { href: string; label: string }) {
       href={href}
       className={
         'flex-1 rounded px-2 py-2 text-center text-xs ' +
-        (active ? 'bg-slate-200 text-slate-950' : 'bg-slate-900/40 text-slate-200')
+        (active
+          ? 'bg-slate-200 text-slate-950'
+          : 'bg-slate-900/40 text-slate-200')
       }
     >
       {label}

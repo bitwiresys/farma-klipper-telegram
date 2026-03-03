@@ -8,3 +8,5 @@ node_modules
 pnpm-lock.yaml
 apps/backend/prisma/dev.db
 apps/backend/data
+apps/backend/prisma/migrations
+docs

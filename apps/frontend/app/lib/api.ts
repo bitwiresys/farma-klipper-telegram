@@ -13,7 +13,10 @@ async function readBodyText(res: Response): Promise<string> {
   }
 }
 
-export async function apiRequest<T>(path: string, opts: { token?: string; method?: string; body?: unknown } = {}): Promise<T> {
+export async function apiRequest<T>(
+  path: string,
+  opts: { token?: string; method?: string; body?: unknown } = {},
+): Promise<T> {
   const base = getBackendBaseUrl();
   if (!base) throw new Error('NEXT_PUBLIC_BACKEND_BASE_URL is not set');
 

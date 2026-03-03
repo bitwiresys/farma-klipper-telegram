@@ -11,7 +11,9 @@ export async function registerAuthRoutes(app: FastifyInstance) {
   app.post('/api/auth/telegram', async (req, reply) => {
     const parsed = AuthTelegramSchema.safeParse(req.body);
     if (!parsed.success) {
-      return reply.code(400).send({ error: 'BAD_REQUEST', details: parsed.error.flatten() });
+      return reply
+        .code(400)
+        .send({ error: 'BAD_REQUEST', details: parsed.error.flatten() });
     }
 
     let tg;

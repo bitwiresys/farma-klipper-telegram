@@ -8,7 +8,12 @@ import { AppShell } from '../components/AppShell';
 import { useAuth } from '../auth/auth_context';
 import { apiRequest } from '../lib/api';
 import { connectBackendWs } from '../lib/ws';
-import { getTelegramInitData, isTelegramWebApp, telegramReady, waitForTelegramWebApp } from '../lib/telegram';
+import {
+  getTelegramInitData,
+  isTelegramWebApp,
+  telegramReady,
+  waitForTelegramWebApp,
+} from '../lib/telegram';
 
 type WsEvent = { type: string; payload: any };
 
@@ -34,14 +39,21 @@ function fmtEta(sec: number | null): string {
 export default function DashboardPage() {
   const { token, setToken } = useAuth();
 
-  const [wsStatus, setWsStatus] = useState<'idle' | 'connecting' | 'open' | 'closed' | 'error'>('idle');
+  const [wsStatus, setWsStatus] = useState<
+    'idle' | 'connecting' | 'open' | 'closed' | 'error'
+  >('idle');
   const [err, setErr] = useState<string | null>(null);
-  const [tgDebug, setTgDebug] = useState<{ hasTelegram: boolean; initDataLen: number }>({
+  const [tgDebug, setTgDebug] = useState<{
+    hasTelegram: boolean;
+    initDataLen: number;
+  }>({
     hasTelegram: false,
     initDataLen: 0,
   });
   const [printers, setPrinters] = useState<PrinterDto[]>([]);
-  const [loginState, setLoginState] = useState<LoginState>({ state: 'logging_in' });
+  const [loginState, setLoginState] = useState<LoginState>({
+    state: 'logging_in',
+  });
 
   useEffect(() => {
     if (token) {
@@ -91,7 +103,9 @@ export default function DashboardPage() {
   const load = async () => {
     if (!token) return;
     setErr(null);
-    const res = await apiRequest<{ printers: PrinterDto[] }>('/api/snapshot', { token });
+    const res = await apiRequest<{ printers: PrinterDto[] }>('/api/snapshot', {
+      token,
+    });
     setPrinters(res.printers);
   };
 
@@ -157,12 +171,16 @@ export default function DashboardPage() {
       {loginState.state !== 'authed' && (
         <div className="mt-3 rounded border border-slate-800 bg-slate-900/40 p-3">
           <div className="text-xs text-slate-400">
-            telegram: {tgDebug.hasTelegram ? 'yes' : 'no'}; initDataLen: {tgDebug.initDataLen}
+            telegram: {tgDebug.hasTelegram ? 'yes' : 'no'}; initDataLen:{' '}
+            {tgDebug.initDataLen}
           </div>
           {loginState.state === 'need_telegram' && (
             <div className="text-xs text-slate-300">
               Открой миниапку из Telegram.
-              <button className="mt-2 w-full rounded bg-slate-950 px-3 py-2 text-xs" onClick={() => void pingHealth()}>
+              <button
+                className="mt-2 w-full rounded bg-slate-950 px-3 py-2 text-xs"
+                onClick={() => void pingHealth()}
+              >
                 Ping /api/health
               </button>
             </div>
@@ -174,29 +192,41 @@ export default function DashboardPage() {
               onClick={() => void login()}
               disabled={loginState.state === 'logging_in'}
             >
-              {loginState.state === 'logging_in' ? 'Logging in…' : 'Login via Telegram'}
+              {loginState.state === 'logging_in'
+                ? 'Logging in…'
+                : 'Login via Telegram'}
             </button>
           )}
 
-          {err && <div className="mt-2 break-all text-xs text-red-400">{err}</div>}
+          {err && (
+            <div className="mt-2 break-all text-xs text-red-400">{err}</div>
+          )}
         </div>
       )}
 
       {loginState.state === 'authed' && (
         <>
-          <button className="mt-3 w-full rounded bg-slate-950 px-3 py-2 text-xs" onClick={() => void load()}>
+          <button
+            className="mt-3 w-full rounded bg-slate-950 px-3 py-2 text-xs"
+            onClick={() => void load()}
+          >
             Refresh snapshot
           </button>
 
           <div className="mt-3 space-y-3">
             {printers.map((p) => (
-              <div key={p.id} className="rounded border border-slate-800 bg-slate-900/40 p-3">
+              <div
+                key={p.id}
+                className="rounded border border-slate-800 bg-slate-900/40 p-3"
+              >
                 <div className="flex items-start justify-between">
                   <div>
                     <div className="text-sm font-medium">{p.displayName}</div>
                     <div className="text-xs text-slate-400">{p.modelName}</div>
                   </div>
-                  {p.needsRekey && <div className="text-xs text-amber-400">needs rekey</div>}
+                  {p.needsRekey && (
+                    <div className="text-xs text-amber-400">needs rekey</div>
+                  )}
                 </div>
 
                 <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
@@ -215,7 +245,8 @@ export default function DashboardPage() {
                   <div className="rounded bg-slate-950 p-2">
                     <div className="text-slate-400">temps</div>
                     <div>
-                      E {p.snapshot.temps.extruder ?? '-'} / B {p.snapshot.temps.bed ?? '-'}
+                      E {p.snapshot.temps.extruder ?? '-'} / B{' '}
+                      {p.snapshot.temps.bed ?? '-'}
                     </div>
                   </div>
                 </div>
@@ -227,7 +258,9 @@ export default function DashboardPage() {
               </div>
             ))}
 
-            {printers.length === 0 && <div className="text-xs text-slate-400">No printers.</div>}
+            {printers.length === 0 && (
+              <div className="text-xs text-slate-400">No printers.</div>
+            )}
           </div>
         </>
       )}

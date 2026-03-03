@@ -22,7 +22,9 @@ function timingSafeEqualHex(aHex: string, bHex: string): boolean {
   return crypto.timingSafeEqual(a, b);
 }
 
-export function parseTelegramInitData(initData: string): Record<string, string> {
+export function parseTelegramInitData(
+  initData: string,
+): Record<string, string> {
   const params = new URLSearchParams(initData);
   const out: Record<string, string> = {};
   for (const [k, v] of params.entries()) out[k] = v;
@@ -49,8 +51,14 @@ export function validateTelegramInitData(opts: {
   pairs.sort();
   const dataCheckString = pairs.join('\n');
 
-  const secretKey = crypto.createHmac('sha256', 'WebAppData').update(opts.botToken).digest();
-  const computedHash = crypto.createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
+  const secretKey = crypto
+    .createHmac('sha256', 'WebAppData')
+    .update(opts.botToken)
+    .digest();
+  const computedHash = crypto
+    .createHmac('sha256', secretKey)
+    .update(dataCheckString)
+    .digest('hex');
 
   if (!timingSafeEqualHex(computedHash, hash)) {
     throw new Error('initData hash mismatch');
@@ -59,7 +67,8 @@ export function validateTelegramInitData(opts: {
   const authDateRaw = data.auth_date;
   if (!authDateRaw) throw new Error('initData missing auth_date');
   const authDate = Number(authDateRaw);
-  if (!Number.isFinite(authDate) || authDate <= 0) throw new Error('initData invalid auth_date');
+  if (!Number.isFinite(authDate) || authDate <= 0)
+    throw new Error('initData invalid auth_date');
 
   if (nowSec - authDate > opts.maxAgeSec) {
     throw new Error('initData expired');
@@ -75,7 +84,8 @@ export function validateTelegramInitData(opts: {
     throw new Error('initData invalid user JSON');
   }
 
-  if (!user?.id || !Number.isFinite(user.id)) throw new Error('initData invalid user.id');
+  if (!user?.id || !Number.isFinite(user.id))
+    throw new Error('initData invalid user.id');
 
   return { authDate, user, raw: data };
 }

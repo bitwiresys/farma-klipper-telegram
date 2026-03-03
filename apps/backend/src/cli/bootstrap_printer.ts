@@ -6,17 +6,25 @@ import { encryptApiKey } from '../crypto_api_key.js';
 import { MoonrakerHttp } from '../moonraker_http.js';
 
 async function main() {
-  if (env.NODE_ENV !== 'development' || process.env.ENABLE_DEV_BOOTSTRAP !== '1') {
-    throw new Error('bootstrap:printer is disabled. Set ENABLE_DEV_BOOTSTRAP=1 and run in NODE_ENV=development');
+  if (
+    env.NODE_ENV !== 'development' ||
+    process.env.ENABLE_DEV_BOOTSTRAP !== '1'
+  ) {
+    throw new Error(
+      'bootstrap:printer is disabled. Set ENABLE_DEV_BOOTSTRAP=1 and run in NODE_ENV=development',
+    );
   }
 
-  const baseUrl = process.env.MOONRAKER_BASE_URL_BOOTSTRAP ?? 'http://192.168.0.45:7125';
+  const baseUrl =
+    process.env.MOONRAKER_BASE_URL_BOOTSTRAP ?? 'http://192.168.0.45:7125';
   const apiKey = process.env.MOONRAKER_API_KEY_BOOTSTRAP;
   if (!apiKey) {
     throw new Error('MOONRAKER_API_KEY_BOOTSTRAP is required');
   }
 
-  const existingModel = await prisma.printerModel.findFirst({ where: { name: 'Test Model' } });
+  const existingModel = await prisma.printerModel.findFirst({
+    where: { name: 'Test Model' },
+  });
   const model =
     existingModel ??
     (await prisma.printerModel.create({
@@ -28,16 +36,27 @@ async function main() {
   const toolheadResp = (await http.queryObjects(['toolhead'])) as any;
   const configResp = (await http.queryObjects(['configfile'])) as any;
 
-  const toolhead = toolheadResp?.result?.status?.toolhead ?? toolheadResp?.status?.toolhead;
+  const toolhead =
+    toolheadResp?.result?.status?.toolhead ?? toolheadResp?.status?.toolhead;
   const axisMin = toolhead?.axis_minimum;
   const axisMax = toolhead?.axis_maximum;
 
-  const bedX = Array.isArray(axisMin) && Array.isArray(axisMax) ? Number(axisMax[0]) - Number(axisMin[0]) : 0;
-  const bedY = Array.isArray(axisMin) && Array.isArray(axisMax) ? Number(axisMax[1]) - Number(axisMin[1]) : 0;
-  const bedZ = Array.isArray(axisMin) && Array.isArray(axisMax) ? Number(axisMax[2]) - Number(axisMin[2]) : 0;
+  const bedX =
+    Array.isArray(axisMin) && Array.isArray(axisMax)
+      ? Number(axisMax[0]) - Number(axisMin[0])
+      : 0;
+  const bedY =
+    Array.isArray(axisMin) && Array.isArray(axisMax)
+      ? Number(axisMax[1]) - Number(axisMin[1])
+      : 0;
+  const bedZ =
+    Array.isArray(axisMin) && Array.isArray(axisMax)
+      ? Number(axisMax[2]) - Number(axisMin[2])
+      : 0;
 
   const nozzleDiameterRaw =
-    configResp?.result?.status?.configfile?.settings?.extruder?.nozzle_diameter ??
+    configResp?.result?.status?.configfile?.settings?.extruder
+      ?.nozzle_diameter ??
     configResp?.status?.configfile?.settings?.extruder?.nozzle_diameter;
   const nozzleDiameter = Number(nozzleDiameterRaw) || 0.4;
 

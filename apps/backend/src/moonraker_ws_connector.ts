@@ -95,7 +95,8 @@ export class MoonrakerWsConnector {
           const parsed = JSON.parse(data.toString('utf8')) as JsonRpcMsg;
           if (parsed.id !== id) return;
           ws.off('message', onMessage);
-          if (parsed.error) return reject(new Error(JSON.stringify(parsed.error)));
+          if (parsed.error)
+            return reject(new Error(JSON.stringify(parsed.error)));
           resolve(parsed.result);
         } catch (e) {
           ws.off('message', onMessage);
@@ -114,7 +115,10 @@ export class MoonrakerWsConnector {
         // connectOnce returns only after close
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        logger.warn({ printerId: this.opts.printerId, err: msg }, 'moonraker ws connect failed');
+        logger.warn(
+          { printerId: this.opts.printerId, err: msg },
+          'moonraker ws connect failed',
+        );
       }
 
       if (this.stopped) return;
@@ -150,7 +154,10 @@ export class MoonrakerWsConnector {
     // Reset backoff after successful TCP+WS handshake
     this.attempt = 0;
 
-    logger.info({ printerId: this.opts.printerId, wsUrl }, 'moonraker ws connected');
+    logger.info(
+      { printerId: this.opts.printerId, wsUrl },
+      'moonraker ws connected',
+    );
 
     // Identify
     const identifyRes = await this.sendRpc('server.connection.identify', {
@@ -160,7 +167,8 @@ export class MoonrakerWsConnector {
       url: 'https://github.com/bitwiresys/farma-klipper-telegram',
     });
 
-    const cid = (identifyRes as { connection_id?: unknown } | null)?.connection_id;
+    const cid = (identifyRes as { connection_id?: unknown } | null)
+      ?.connection_id;
     this.connectionId = typeof cid === 'string' ? cid : null;
 
     logger.info(
@@ -181,7 +189,10 @@ export class MoonrakerWsConnector {
       },
     });
 
-    logger.info({ printerId: this.opts.printerId }, 'moonraker ws subscribe ok');
+    logger.info(
+      { printerId: this.opts.printerId },
+      'moonraker ws subscribe ok',
+    );
 
     let gotFirstStatus = false;
 
@@ -192,7 +203,10 @@ export class MoonrakerWsConnector {
         if (parsed.method === 'notify_status_update') {
           if (!gotFirstStatus) {
             gotFirstStatus = true;
-            logger.info({ printerId: this.opts.printerId }, 'moonraker ws first status_update received');
+            logger.info(
+              { printerId: this.opts.printerId },
+              'moonraker ws first status_update received',
+            );
           }
           const params = parsed.params;
           // Moonraker sends [diff, eventtime]
@@ -208,7 +222,9 @@ export class MoonrakerWsConnector {
 
         if (parsed.method === 'notify_gcode_response') {
           const params = parsed.params;
-          const line = Array.isArray(params) ? String(params[0] ?? '') : String(params ?? '');
+          const line = Array.isArray(params)
+            ? String(params[0] ?? '')
+            : String(params ?? '');
           if (line) {
             this.pushGcode(line);
             this.opts.callbacks.onGcodeResponse(line);
@@ -216,7 +232,10 @@ export class MoonrakerWsConnector {
           return;
         }
       } catch (e) {
-        logger.debug({ printerId: this.opts.printerId }, 'moonraker ws message parse failed');
+        logger.debug(
+          { printerId: this.opts.printerId },
+          'moonraker ws message parse failed',
+        );
       }
     });
 
@@ -225,7 +244,10 @@ export class MoonrakerWsConnector {
       ws.once('error', () => resolve());
     });
 
-    logger.warn({ printerId: this.opts.printerId }, 'moonraker ws disconnected');
+    logger.warn(
+      { printerId: this.opts.printerId },
+      'moonraker ws disconnected',
+    );
 
     this.ws = null;
     this.attempt = 0;

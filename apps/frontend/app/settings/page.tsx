@@ -37,15 +37,22 @@ export default function SettingsPage() {
           <div className="break-all font-mono">{ws || '(not set)'}</div>
 
           <div className="mt-3 text-slate-400">auth</div>
-          <div className="break-all font-mono">{token ? 'token present' : 'no token'}</div>
+          <div className="break-all font-mono">
+            {token ? 'token present' : 'no token'}
+          </div>
 
           <div className="mt-3 flex gap-2">
-            <button className="flex-1 rounded bg-slate-950 px-3 py-2 text-xs" onClick={() => void ping()}>
+            <button
+              className="flex-1 rounded bg-slate-950 px-3 py-2 text-xs"
+              onClick={() => void ping()}
+            >
               Ping /api/health
             </button>
           </div>
 
-          <div className="mt-3 rounded bg-slate-950 p-3 font-mono text-xs">{health}</div>
+          <div className="mt-3 rounded bg-slate-950 p-3 font-mono text-xs">
+            {health}
+          </div>
         </div>
       </div>
     </AppShell>

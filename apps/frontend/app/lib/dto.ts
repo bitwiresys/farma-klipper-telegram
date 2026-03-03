@@ -22,7 +22,11 @@ export type PrinterDto = {
   snapshot: PrinterSnapshotDto;
 };
 
-export type PrintHistoryStatus = 'in_progress' | 'completed' | 'cancelled' | 'error';
+export type PrintHistoryStatus =
+  | 'in_progress'
+  | 'completed'
+  | 'cancelled'
+  | 'error';
 
 export type PrintHistoryDto = {
   id: string;

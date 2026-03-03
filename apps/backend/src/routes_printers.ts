@@ -7,7 +7,9 @@ import { printerRuntime } from './printer_runtime.js';
 
 export async function registerPrintersRoutes(app: FastifyInstance) {
   app.get('/api/printers', async (_req, reply) => {
-    const printers = (await prisma.printer.findMany({ include: { model: true } })) as Array<{
+    const printers = (await prisma.printer.findMany({
+      include: { model: true },
+    })) as Array<{
       id: string;
       displayName: string;
       modelId: string;
@@ -36,7 +38,9 @@ export async function registerPrintersRoutes(app: FastifyInstance) {
   app.post('/api/printers', async (req, reply) => {
     const parsed = CreatePrinterSchema.safeParse(req.body);
     if (!parsed.success) {
-      return reply.code(400).send({ error: 'BAD_REQUEST', details: parsed.error.flatten() });
+      return reply
+        .code(400)
+        .send({ error: 'BAD_REQUEST', details: parsed.error.flatten() });
     }
 
     const created = await printerRuntime.createPrinter({
@@ -46,7 +50,10 @@ export async function registerPrintersRoutes(app: FastifyInstance) {
       moonrakerApiKey: parsed.data.moonrakerApiKey,
     });
 
-    const p = await prisma.printer.findUnique({ where: { id: created.id }, include: { model: true } });
+    const p = await prisma.printer.findUnique({
+      where: { id: created.id },
+      include: { model: true },
+    });
     if (!p) return reply.code(500).send({ error: 'INTERNAL_ERROR' });
 
     return reply.code(201).send({
@@ -68,7 +75,9 @@ export async function registerPrintersRoutes(app: FastifyInstance) {
   app.patch('/api/printers/:id', async (req, reply) => {
     const parsed = UpdatePrinterSchema.safeParse(req.body);
     if (!parsed.success) {
-      return reply.code(400).send({ error: 'BAD_REQUEST', details: parsed.error.flatten() });
+      return reply
+        .code(400)
+        .send({ error: 'BAD_REQUEST', details: parsed.error.flatten() });
     }
 
     const id = (req.params as any).id as string;
@@ -79,7 +88,10 @@ export async function registerPrintersRoutes(app: FastifyInstance) {
       moonrakerApiKey: parsed.data.moonrakerApiKey,
     });
 
-    const p = await prisma.printer.findUnique({ where: { id: updated.id }, include: { model: true } });
+    const p = await prisma.printer.findUnique({
+      where: { id: updated.id },
+      include: { model: true },
+    });
     if (!p) return reply.code(500).send({ error: 'INTERNAL_ERROR' });
 
     return reply.send({
@@ -113,7 +125,10 @@ export async function registerPrintersRoutes(app: FastifyInstance) {
   app.post('/api/printers/:id/rescan', async (req, reply) => {
     const id = (req.params as any).id as string;
     await printerRuntime.rescanPrinter(id);
-    const p = await prisma.printer.findUnique({ where: { id }, include: { model: true } });
+    const p = await prisma.printer.findUnique({
+      where: { id },
+      include: { model: true },
+    });
     if (!p) return reply.code(404).send({ error: 'NOT_FOUND' });
     return reply.send({
       printer: {

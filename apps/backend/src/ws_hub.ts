@@ -29,9 +29,12 @@ export class WsHub {
 
   async addClient(client: Client, token: string) {
     try {
-      const payload = jwt.verify(token, env.JWT_SECRET, { algorithms: ['HS256'] });
+      const payload = jwt.verify(token, env.JWT_SECRET, {
+        algorithms: ['HS256'],
+      });
       const sub = (payload as any)?.sub;
-      if (typeof sub !== 'string' || !sub) throw new Error('Invalid token subject');
+      if (typeof sub !== 'string' || !sub)
+        throw new Error('Invalid token subject');
       const user = await prisma.user.findUnique({ where: { telegramId: sub } });
       if (!user || !user.isAllowed) throw new Error('User not allowed');
 
@@ -114,7 +117,9 @@ export async function registerWsHub(app: FastifyInstance) {
   });
 
   const handler = async (socket: WebSocket, req: any) => {
-    const qs = (req.url ?? '').includes('?') ? (req.url ?? '').slice((req.url ?? '').indexOf('?') + 1) : '';
+    const qs = (req.url ?? '').includes('?')
+      ? (req.url ?? '').slice((req.url ?? '').indexOf('?') + 1)
+      : '';
     const token = new URLSearchParams(qs).get('token') ?? '';
 
     const client: Client = {

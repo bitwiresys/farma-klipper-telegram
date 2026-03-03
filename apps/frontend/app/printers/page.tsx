@@ -28,9 +28,14 @@ export default function PrintersPage() {
   const load = async () => {
     if (!token) return;
     setErr(null);
-    const p = await apiRequest<{ printers: PrinterDto[] }>('/api/printers', { token });
+    const p = await apiRequest<{ printers: PrinterDto[] }>('/api/printers', {
+      token,
+    });
     setPrinters(p.printers);
-    const m = await apiRequest<{ models: Array<{ id: string; name: string }> }>('/api/printer-models', { token });
+    const m = await apiRequest<{ models: Array<{ id: string; name: string }> }>(
+      '/api/printer-models',
+      { token },
+    );
     setModels(m.models);
   };
 
@@ -42,7 +47,11 @@ export default function PrintersPage() {
     if (!token) return;
     setErr(null);
     if (!newModelName.trim()) return;
-    await apiRequest('/api/printer-models', { token, method: 'POST', body: { name: newModelName.trim() } });
+    await apiRequest('/api/printer-models', {
+      token,
+      method: 'POST',
+      body: { name: newModelName.trim() },
+    });
     setNewModelName('');
     await load();
   };
@@ -50,8 +59,17 @@ export default function PrintersPage() {
   const createPrinter = async () => {
     if (!token) return;
     setErr(null);
-    await apiRequest('/api/printers', { token, method: 'POST', body: newPrinter });
-    setNewPrinter({ displayName: '', modelId: '', moonrakerBaseUrl: '', moonrakerApiKey: '' });
+    await apiRequest('/api/printers', {
+      token,
+      method: 'POST',
+      body: newPrinter,
+    });
+    setNewPrinter({
+      displayName: '',
+      modelId: '',
+      moonrakerBaseUrl: '',
+      moonrakerApiKey: '',
+    });
     await load();
   };
 
@@ -97,12 +115,17 @@ export default function PrintersPage() {
     <AppShell>
       <div className="flex items-center justify-between">
         <div className="text-sm font-medium">Printers</div>
-        <button className="rounded bg-slate-950 px-3 py-2 text-xs" onClick={() => void load()}>
+        <button
+          className="rounded bg-slate-950 px-3 py-2 text-xs"
+          onClick={() => void load()}
+        >
           Refresh
         </button>
       </div>
 
-      {!token && <div className="mt-3 text-xs text-slate-400">Login required.</div>}
+      {!token && (
+        <div className="mt-3 text-xs text-slate-400">Login required.</div>
+      )}
       {err && <div className="mt-3 break-all text-xs text-red-400">{err}</div>}
 
       {token && (
@@ -116,7 +139,10 @@ export default function PrintersPage() {
                 value={newModelName}
                 onChange={(e) => setNewModelName(e.target.value)}
               />
-              <button className="rounded bg-slate-200 px-3 py-2 text-xs font-medium text-slate-950" onClick={() => void createModelInline()}>
+              <button
+                className="rounded bg-slate-200 px-3 py-2 text-xs font-medium text-slate-950"
+                onClick={() => void createModelInline()}
+              >
                 Create
               </button>
             </div>
@@ -129,12 +155,16 @@ export default function PrintersPage() {
                 className="w-full rounded bg-slate-950 p-2 text-xs"
                 placeholder="displayName"
                 value={newPrinter.displayName}
-                onChange={(e) => setNewPrinter((p) => ({ ...p, displayName: e.target.value }))}
+                onChange={(e) =>
+                  setNewPrinter((p) => ({ ...p, displayName: e.target.value }))
+                }
               />
               <select
                 className="w-full rounded bg-slate-950 p-2 text-xs"
                 value={newPrinter.modelId}
-                onChange={(e) => setNewPrinter((p) => ({ ...p, modelId: e.target.value }))}
+                onChange={(e) =>
+                  setNewPrinter((p) => ({ ...p, modelId: e.target.value }))
+                }
               >
                 <option value="">model...</option>
                 {models.map((m) => (
@@ -147,15 +177,27 @@ export default function PrintersPage() {
                 className="w-full rounded bg-slate-950 p-2 text-xs"
                 placeholder="moonrakerBaseUrl (http://...:7125)"
                 value={newPrinter.moonrakerBaseUrl}
-                onChange={(e) => setNewPrinter((p) => ({ ...p, moonrakerBaseUrl: e.target.value }))}
+                onChange={(e) =>
+                  setNewPrinter((p) => ({
+                    ...p,
+                    moonrakerBaseUrl: e.target.value,
+                  }))
+                }
               />
               <input
                 className="w-full rounded bg-slate-950 p-2 text-xs"
                 placeholder="moonrakerApiKey"
                 value={newPrinter.moonrakerApiKey}
-                onChange={(e) => setNewPrinter((p) => ({ ...p, moonrakerApiKey: e.target.value }))}
+                onChange={(e) =>
+                  setNewPrinter((p) => ({
+                    ...p,
+                    moonrakerApiKey: e.target.value,
+                  }))
+                }
               />
-              <div className="text-xs text-slate-400">apiKey will not be displayed after save.</div>
+              <div className="text-xs text-slate-400">
+                apiKey will not be displayed after save.
+              </div>
               <button
                 className="w-full rounded bg-slate-200 px-3 py-2 text-xs font-medium text-slate-950"
                 onClick={() => void createPrinter()}
@@ -167,13 +209,18 @@ export default function PrintersPage() {
 
           <div className="mt-3 space-y-3">
             {printers.map((p) => (
-              <div key={p.id} className="rounded border border-slate-800 bg-slate-900/40 p-3">
+              <div
+                key={p.id}
+                className="rounded border border-slate-800 bg-slate-900/40 p-3"
+              >
                 <div className="flex items-start justify-between">
                   <div>
                     <div className="text-sm font-medium">{p.displayName}</div>
                     <div className="text-xs text-slate-400">{p.modelName}</div>
                   </div>
-                  <div className="text-xs text-slate-400">{p.id.slice(0, 8)}</div>
+                  <div className="text-xs text-slate-400">
+                    {p.id.slice(0, 8)}
+                  </div>
                 </div>
 
                 <div className="mt-2 text-xs text-slate-300">
@@ -182,33 +229,53 @@ export default function PrintersPage() {
                 </div>
 
                 <div className="mt-2 grid grid-cols-3 gap-2">
-                  <button className="rounded bg-slate-950 px-2 py-2 text-xs" onClick={() => void testPrinter(p.id)}>
+                  <button
+                    className="rounded bg-slate-950 px-2 py-2 text-xs"
+                    onClick={() => void testPrinter(p.id)}
+                  >
                     Test
                   </button>
-                  <button className="rounded bg-slate-950 px-2 py-2 text-xs" onClick={() => void rescanPrinter(p.id)}>
+                  <button
+                    className="rounded bg-slate-950 px-2 py-2 text-xs"
+                    onClick={() => void rescanPrinter(p.id)}
+                  >
                     Rescan
                   </button>
-                  <button className="rounded bg-red-950/40 px-2 py-2 text-xs" onClick={() => void removePrinter(p.id)}>
+                  <button
+                    className="rounded bg-red-950/40 px-2 py-2 text-xs"
+                    onClick={() => void removePrinter(p.id)}
+                  >
                     Remove
                   </button>
                 </div>
 
                 {devOnly && (
                   <div className="mt-2 grid grid-cols-3 gap-2">
-                    <button className="rounded bg-slate-950 px-2 py-2 text-xs" onClick={() => void pausePrinter(p.id)}>
+                    <button
+                      className="rounded bg-slate-950 px-2 py-2 text-xs"
+                      onClick={() => void pausePrinter(p.id)}
+                    >
                       Pause
                     </button>
-                    <button className="rounded bg-slate-950 px-2 py-2 text-xs" onClick={() => void resumePrinter(p.id)}>
+                    <button
+                      className="rounded bg-slate-950 px-2 py-2 text-xs"
+                      onClick={() => void resumePrinter(p.id)}
+                    >
                       Resume
                     </button>
-                    <button className="rounded bg-red-950/40 px-2 py-2 text-xs" onClick={() => void cancelPrinter(p.id)}>
+                    <button
+                      className="rounded bg-red-950/40 px-2 py-2 text-xs"
+                      onClick={() => void cancelPrinter(p.id)}
+                    >
                       Cancel
                     </button>
                   </div>
                 )}
               </div>
             ))}
-            {printers.length === 0 && <div className="text-xs text-slate-400">No printers.</div>}
+            {printers.length === 0 && (
+              <div className="text-xs text-slate-400">No printers.</div>
+            )}
           </div>
         </>
       )}

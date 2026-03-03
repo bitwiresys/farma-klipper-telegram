@@ -8,10 +8,12 @@
   ],
   "scripts": {
     "format": "prettier -w .",
+    "format:check": "prettier -c .",
     "lint": "eslint .",
     "typecheck": "pnpm -r typecheck",
     "dev": "pnpm -r dev",
-    "build": "pnpm -r build"
+    "build": "pnpm -r build",
+    "check": "pnpm format:check && pnpm lint && pnpm -r typecheck && pnpm -r build && pnpm --filter @farma/backend prisma:generate && pnpm --filter @farma/backend prisma:validate && pnpm --filter @farma/backend test && python tools/scan_secrets.py && node tools/check_env_sync.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.19.0",

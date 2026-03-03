@@ -10,14 +10,18 @@ const CreatePrinterModelSchema = z.object({
 
 export async function registerPrinterModelsRoutes(app: FastifyInstance) {
   app.get('/api/printer-models', async (_req, reply) => {
-    const models = await prisma.printerModel.findMany({ orderBy: { name: 'asc' } });
+    const models = await prisma.printerModel.findMany({
+      orderBy: { name: 'asc' },
+    });
     return reply.send({ models });
   });
 
   app.post('/api/printer-models', async (req, reply) => {
     const parsed = CreatePrinterModelSchema.safeParse(req.body);
     if (!parsed.success) {
-      return reply.code(400).send({ error: 'BAD_REQUEST', details: parsed.error.flatten() });
+      return reply
+        .code(400)
+        .send({ error: 'BAD_REQUEST', details: parsed.error.flatten() });
     }
 
     const created = await prisma.printerModel.create({

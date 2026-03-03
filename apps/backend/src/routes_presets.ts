@@ -35,7 +35,9 @@ function presetToDto(p: any) {
     thumbnailUrl: p.thumbnailPath ? `/api/presets/${p.id}/thumbnail` : null,
     compatibilityRules: {
       allowedModelIds: (p.allowedModels ?? []).map((x: any) => x.modelId),
-      allowedNozzleDiameters: Array.isArray(p.compatibilityRules?.allowedNozzleDiameters)
+      allowedNozzleDiameters: Array.isArray(
+        p.compatibilityRules?.allowedNozzleDiameters,
+      )
         ? p.compatibilityRules.allowedNozzleDiameters
         : [],
       minBedX: p.compatibilityRules?.minBedX ?? 0,
@@ -87,7 +89,8 @@ export async function registerPresetsRoutes(app: FastifyInstance) {
 
     const preset = await prisma.preset.findUnique({ where: { id } });
     if (!preset) return reply.code(404).send({ error: 'NOT_FOUND' });
-    if (!preset.thumbnailPath) return reply.code(404).send({ error: 'NO_THUMBNAIL' });
+    if (!preset.thumbnailPath)
+      return reply.code(404).send({ error: 'NO_THUMBNAIL' });
 
     let abs: string;
     try {
@@ -108,7 +111,10 @@ export async function registerPresetsRoutes(app: FastifyInstance) {
 
   app.post('/api/presets', async (req, reply) => {
     if (!req.isMultipart()) {
-      return reply.code(400).send({ error: 'BAD_REQUEST', message: 'multipart/form-data required' });
+      return reply.code(400).send({
+        error: 'BAD_REQUEST',
+        message: 'multipart/form-data required',
+      });
     }
 
     const parts = req.parts();
@@ -128,24 +134,41 @@ export async function registerPresetsRoutes(app: FastifyInstance) {
       }
     }
 
-    if (!fileBuf) return reply.code(400).send({ error: 'BAD_REQUEST', message: 'gcode file is required (field: gcode or file)' });
-    if (!fileName) return reply.code(400).send({ error: 'BAD_REQUEST', message: 'gcode filename missing' });
+    if (!fileBuf)
+      return reply.code(400).send({
+        error: 'BAD_REQUEST',
+        message: 'gcode file is required (field: gcode or file)',
+      });
+    if (!fileName)
+      return reply
+        .code(400)
+        .send({ error: 'BAD_REQUEST', message: 'gcode filename missing' });
     if (!isSafeFilename(fileName)) {
-      return reply.code(400).send({ error: 'BAD_REQUEST', message: 'invalid gcode filename' });
+      return reply
+        .code(400)
+        .send({ error: 'BAD_REQUEST', message: 'invalid gcode filename' });
     }
 
-    if (!jsonRaw) return reply.code(400).send({ error: 'BAD_REQUEST', message: 'data is required (field: data)' });
+    if (!jsonRaw)
+      return reply.code(400).send({
+        error: 'BAD_REQUEST',
+        message: 'data is required (field: data)',
+      });
 
     let data: unknown;
     try {
       data = JSON.parse(jsonRaw);
     } catch {
-      return reply.code(400).send({ error: 'BAD_REQUEST', message: 'data must be valid JSON' });
+      return reply
+        .code(400)
+        .send({ error: 'BAD_REQUEST', message: 'data must be valid JSON' });
     }
 
     const parsed = CreatePresetSchema.safeParse(data);
     if (!parsed.success) {
-      return reply.code(400).send({ error: 'BAD_REQUEST', details: parsed.error.flatten() });
+      return reply
+        .code(400)
+        .send({ error: 'BAD_REQUEST', details: parsed.error.flatten() });
     }
 
     const presetId = crypto.randomUUID();
@@ -164,13 +187,16 @@ export async function registerPresetsRoutes(app: FastifyInstance) {
         gcodePath: gcodeRel,
         gcodeMeta: Prisma.DbNull,
         allowedModels: {
-          create: parsed.data.compatibilityRules.allowedModelIds.map((modelId) => ({ modelId })),
+          create: parsed.data.compatibilityRules.allowedModelIds.map(
+            (modelId) => ({ modelId }),
+          ),
         },
         compatibilityRules: {
           create: {
             minBedX: parsed.data.compatibilityRules.minBedX,
             minBedY: parsed.data.compatibilityRules.minBedY,
-            allowedNozzleDiameters: parsed.data.compatibilityRules.allowedNozzleDiameters,
+            allowedNozzleDiameters:
+              parsed.data.compatibilityRules.allowedNozzleDiameters,
           },
         },
       },
@@ -180,7 +206,10 @@ export async function registerPresetsRoutes(app: FastifyInstance) {
       },
     });
 
-    wsHub.broadcast({ type: 'PRESET_UPDATED', payload: { presetId: created.id } });
+    wsHub.broadcast({
+      type: 'PRESET_UPDATED',
+      payload: { presetId: created.id },
+    });
 
     return reply.code(201).send({ preset: presetToDto(created) });
   });
@@ -190,10 +219,15 @@ export async function registerPresetsRoutes(app: FastifyInstance) {
 
     const parsed = UpdatePresetSchema.safeParse(req.body);
     if (!parsed.success) {
-      return reply.code(400).send({ error: 'BAD_REQUEST', details: parsed.error.flatten() });
+      return reply
+        .code(400)
+        .send({ error: 'BAD_REQUEST', details: parsed.error.flatten() });
     }
 
-    const existing = await prisma.preset.findUnique({ where: { id }, include: { compatibilityRules: true } });
+    const existing = await prisma.preset.findUnique({
+      where: { id },
+      include: { compatibilityRules: true },
+    });
     if (!existing) return reply.code(404).send({ error: 'NOT_FOUND' });
 
     const rules = parsed.data.compatibilityRules;
@@ -204,7 +238,10 @@ export async function registerPresetsRoutes(app: FastifyInstance) {
         title: parsed.data.title,
         plasticType: parsed.data.plasticType,
         colorHex: parsed.data.colorHex,
-        description: parsed.data.description === undefined ? undefined : parsed.data.description,
+        description:
+          parsed.data.description === undefined
+            ? undefined
+            : parsed.data.description,
         allowedModels:
           rules && Array.isArray(rules.allowedModelIds)
             ? {
@@ -233,7 +270,10 @@ export async function registerPresetsRoutes(app: FastifyInstance) {
       include: { allowedModels: true, compatibilityRules: true },
     });
 
-    wsHub.broadcast({ type: 'PRESET_UPDATED', payload: { presetId: updated.id } });
+    wsHub.broadcast({
+      type: 'PRESET_UPDATED',
+      payload: { presetId: updated.id },
+    });
 
     return reply.send({ preset: presetToDto(updated) });
   });

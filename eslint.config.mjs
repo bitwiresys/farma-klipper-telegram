@@ -14,6 +14,15 @@ export default [
   },
   js.configs.recommended,
   {
+    files: ['tools/**/*.{js,mjs,cjs}'],
+    languageOptions: {
+      globals: {
+        console: 'readonly',
+        process: 'readonly',
+      },
+    },
+  },
+  {
     rules: {
       'no-unused-vars': 'off',
     },
