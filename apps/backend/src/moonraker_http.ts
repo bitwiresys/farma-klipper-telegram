@@ -90,12 +90,14 @@ export class MoonrakerHttp {
   ): Promise<T> {
     const url = `${this.baseUrl}${path}`;
     logger.debug({ url }, 'moonraker http post');
+
+    const hasBody = body !== undefined;
     return fetchJson<T>(
       url,
       {
         method: 'POST',
-        headers: this.headers(),
-        body: body === undefined ? undefined : JSON.stringify(body),
+        headers: hasBody ? this.headers() : this.headersAuthOnly(),
+        body: hasBody ? JSON.stringify(body) : undefined,
       },
       init?.timeoutMs ?? 8000,
     );
