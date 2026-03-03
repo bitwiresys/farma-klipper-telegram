@@ -23,18 +23,20 @@ export async function registerHistoryRoutes(app: FastifyInstance) {
       take: 200,
     });
 
-    const result: PrintHistoryDto[] = items.map((x) => ({
-      id: x.id,
-      printerId: x.printerId,
-      filename: x.filename,
-      status: x.status as any,
-      startedAt: x.startedAt.toISOString(),
-      endedAt: x.endedAt ? x.endedAt.toISOString() : null,
-      printDurationSec: x.printDurationSec,
-      totalDurationSec: x.totalDurationSec,
-      filamentUsedMm: x.filamentUsedMm,
-      errorMessage: x.errorMessage,
-    }));
+    const result: PrintHistoryDto[] = items.map((x) => {
+      return {
+        id: x.id,
+        printerId: x.printerId,
+        filename: x.filename,
+        status: x.status as PrintHistoryDto['status'],
+        startedAt: x.startedAt.toISOString(),
+        endedAt: x.endedAt ? x.endedAt.toISOString() : null,
+        printDurationSec: x.printDurationSec,
+        totalDurationSec: x.totalDurationSec,
+        filamentUsedMm: x.filamentUsedMm,
+        errorMessage: x.errorMessage,
+      };
+    });
 
     return reply.send({ history: result });
   });

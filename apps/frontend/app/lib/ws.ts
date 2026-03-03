@@ -1,0 +1,70 @@
+import { getBackendWsUrl } from './env';
+
+export type WsEvent = {
+  type: string;
+  payload: unknown;
+};
+
+export function connectBackendWs(opts: {
+  token: string;
+  onEvent: (ev: WsEvent) => void;
+  onStatus: (s: 'connecting' | 'open' | 'closed' | 'error') => void;
+}): { close: () => void } {
+  const base = getBackendWsUrl();
+  if (!base) throw new Error('NEXT_PUBLIC_BACKEND_WS_URL is not set');
+
+  let stopped = false;
+  let ws: WebSocket | null = null;
+  let attempt = 0;
+
+  const connect = () => {
+    if (stopped) return;
+
+    attempt++;
+    opts.onStatus('connecting');
+
+    const u = new URL(base);
+    u.pathname = '/api/ws';
+    u.search = new URLSearchParams({ token: opts.token }).toString();
+
+    ws = new WebSocket(u.toString());
+
+    ws.onopen = () => {
+      attempt = 0;
+      opts.onStatus('open');
+    };
+
+    ws.onmessage = (m) => {
+      try {
+        const parsed = JSON.parse(String(m.data)) as WsEvent;
+        opts.onEvent(parsed);
+      } catch {
+        return;
+      }
+    };
+
+    ws.onerror = () => {
+      opts.onStatus('error');
+    };
+
+    ws.onclose = () => {
+      opts.onStatus('closed');
+      if (stopped) return;
+      const delay = Math.min(30_000, Math.max(1, attempt) * 1000);
+      setTimeout(connect, delay);
+    };
+  };
+
+  connect();
+
+  return {
+    close: () => {
+      stopped = true;
+      try {
+        ws?.close();
+      } catch {
+        return;
+      }
+    },
+  };
+}

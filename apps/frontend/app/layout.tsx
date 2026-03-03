@@ -2,6 +2,8 @@ import './globals.css';
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 
+import { AuthProvider } from './auth/auth_context';
+
 export const metadata: Metadata = {
   title: 'Farma',
   description: 'Telegram Mini App for Klipper/Moonraker',
@@ -12,7 +14,9 @@ export default function RootLayout({
 }: Readonly<{ children: ReactNode }>) {
   return (
     <html lang="en">
-      <body className="min-h-screen bg-slate-950 text-slate-50">{children}</body>
+      <body className="min-h-screen bg-slate-950 text-slate-50">
+        <AuthProvider>{children}</AuthProvider>
+      </body>
     </html>
   );
 }
