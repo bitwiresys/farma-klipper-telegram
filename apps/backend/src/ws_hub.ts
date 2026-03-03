@@ -113,7 +113,7 @@ export async function registerWsHub(app: FastifyInstance) {
     });
   });
 
-  app.get('/api/ws', { websocket: true }, async (socket: WebSocket, req) => {
+  const handler = async (socket: WebSocket, req: any) => {
     const qs = (req.url ?? '').includes('?') ? (req.url ?? '').slice((req.url ?? '').indexOf('?') + 1) : '';
     const token = new URLSearchParams(qs).get('token') ?? '';
 
@@ -127,5 +127,8 @@ export async function registerWsHub(app: FastifyInstance) {
     socket.on('close', () => {
       hub.removeClient(client);
     });
-  });
+  };
+
+  app.get('/api/ws', { websocket: true }, handler);
+  app.get('/api/ws/', { websocket: true }, handler);
 }
