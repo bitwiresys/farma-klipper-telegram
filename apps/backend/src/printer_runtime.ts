@@ -3,6 +3,7 @@ import { HistoryStatus, PrinterState, type PrintHistoryDto, type PrinterSnapshot
 import { env } from './env.js';
 import { prisma } from './prisma.js';
 import { decryptApiKey, encryptApiKey } from './crypto_api_key.js';
+import { logger } from './logger.js';
 import { MoonrakerHttp } from './moonraker_http.js';
 import { MoonrakerWsConnector } from './moonraker_ws_connector.js';
 import { SnapshotCache } from './snapshot_cache.js';
@@ -139,7 +140,14 @@ export class PrinterRuntimeManager {
   private async getPrinterSecrets(printerId: string) {
     const p = await prisma.printer.findUnique({ where: { id: printerId } });
     if (!p) throw new Error('Printer not found');
-    const apiKey = decryptApiKey(p.apiKeyEncrypted, env.PRINTER_API_KEY_ENC_KEY);
+    let apiKey = '';
+    try {
+      apiKey = decryptApiKey(p.apiKeyEncrypted, env.PRINTER_API_KEY_ENC_KEY);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      logger.warn({ printerId, err: msg }, 'failed to decrypt printer api key; continuing without api key');
+      apiKey = '';
+    }
     return { baseUrl: p.baseUrl, apiKey };
   }
 
