@@ -6,10 +6,6 @@ import { env } from '../env.js';
 import { prisma } from '../prisma.js';
 
 async function main() {
-  if (!env.ENABLE_DEV_BOOTSTRAP) {
-    throw new Error('ENABLE_DEV_BOOTSTRAP=1 is required to run bootstrap:token');
-  }
-
   const telegramId = 'dev';
 
   await prisma.user.upsert({

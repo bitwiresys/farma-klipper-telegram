@@ -13,5 +13,6 @@ apps/backend/dist
 apps/backend/node_modules
 apps/frontend/.next
 apps/frontend/node_modules
+apps/frontend/tsconfig.tsbuildinfo
 packages/shared/dist
 packages/shared/node_modules

@@ -51,18 +51,6 @@ export class MoonrakerHttp {
   }
 
   async get<T>(path: string, init?: MoonrakerRequestInit): Promise<T> {
-    const p = path.split('?')[0] ?? path;
-    const allowedGetPrefixes = [
-      '/server/info',
-      '/printer/info',
-      '/server/history/list',
-      '/server/files/metadata',
-      '/server/files/thumbnails',
-    ];
-
-    if (!allowedGetPrefixes.some((x) => p === x || p.startsWith(`${x}?`))) {
-      throw new Error(`READ_ONLY_BLOCKED: moonraker get blocked (${p})`);
-    }
     const url = `${this.baseUrl}${path}`;
     logger.debug({ url }, 'moonraker http get');
     return fetchJson<T>(
@@ -76,10 +64,6 @@ export class MoonrakerHttp {
   }
 
   async post<T>(path: string, body?: unknown, init?: MoonrakerRequestInit): Promise<T> {
-    const p = path.split('?')[0] ?? path;
-    if (p !== '/printer/objects/query') {
-      throw new Error(`READ_ONLY_BLOCKED: moonraker post blocked (${p})`);
-    }
     const url = `${this.baseUrl}${path}`;
     logger.debug({ url }, 'moonraker http post');
     return fetchJson<T>(

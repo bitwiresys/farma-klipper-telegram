@@ -31,18 +31,12 @@ export function AppShell({ children }: { children: ReactNode }) {
       <div className="flex items-center justify-between">
         <div>
           <div className="text-lg font-semibold">Farma</div>
-          <div className="text-xs text-slate-400">READ-ONLY mode</div>
         </div>
 
         <div className="text-right text-xs text-slate-400">
           <div>v={v || '-'}</div>
           <div>{token ? 'auth: ok' : 'auth: none'}</div>
         </div>
-      </div>
-
-      <div className="mt-3 rounded border border-slate-800 bg-slate-900/40 p-3 text-xs text-slate-200">
-        <div className="font-medium">READ-ONLY mode enabled</div>
-        <div className="mt-1 text-slate-300">UI не содержит кнопок управления печатью.</div>
       </div>
 
       <div className="mt-4 flex-1">{children}</div>

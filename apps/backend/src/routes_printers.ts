@@ -2,7 +2,6 @@ import type { FastifyInstance } from 'fastify';
 
 import { CreatePrinterSchema, UpdatePrinterSchema } from '@farma/shared';
 
-import { env } from './env.js';
 import { prisma } from './prisma.js';
 import { printerRuntime } from './printer_runtime.js';
 
@@ -132,23 +131,21 @@ export async function registerPrintersRoutes(app: FastifyInstance) {
     });
   });
 
-  if (env.ENABLE_WRITE_ACTIONS) {
-    app.post('/api/printers/:id/pause', async (req, reply) => {
-      const id = (req.params as any).id as string;
-      const res = await printerRuntime.action(id, 'pause');
-      return reply.send({ ok: true, res });
-    });
+  app.post('/api/printers/:id/pause', async (req, reply) => {
+    const id = (req.params as any).id as string;
+    const res = await printerRuntime.action(id, 'pause');
+    return reply.send({ ok: true, res });
+  });
 
-    app.post('/api/printers/:id/resume', async (req, reply) => {
-      const id = (req.params as any).id as string;
-      const res = await printerRuntime.action(id, 'resume');
-      return reply.send({ ok: true, res });
-    });
+  app.post('/api/printers/:id/resume', async (req, reply) => {
+    const id = (req.params as any).id as string;
+    const res = await printerRuntime.action(id, 'resume');
+    return reply.send({ ok: true, res });
+  });
 
-    app.post('/api/printers/:id/cancel', async (req, reply) => {
-      const id = (req.params as any).id as string;
-      const res = await printerRuntime.action(id, 'cancel');
-      return reply.send({ ok: true, res });
-    });
-  }
+  app.post('/api/printers/:id/cancel', async (req, reply) => {
+    const id = (req.params as any).id as string;
+    const res = await printerRuntime.action(id, 'cancel');
+    return reply.send({ ok: true, res });
+  });
 }

@@ -383,9 +383,6 @@ export class PrinterRuntimeManager {
   }
 
   async action(printerId: string, action: 'pause' | 'resume' | 'cancel') {
-    if (env.BACKEND_READ_ONLY || !env.ENABLE_WRITE_ACTIONS) {
-      throw new Error('READ_ONLY: printer action blocked');
-    }
     const { baseUrl, apiKey } = await this.getPrinterSecrets(printerId);
     const http = new MoonrakerHttp({ baseUrl, apiKey });
 

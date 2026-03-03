@@ -73,6 +73,24 @@ export default function PrintersPage() {
     await load();
   };
 
+  const pausePrinter = async (id: string) => {
+    if (!token) return;
+    setErr(null);
+    await apiRequest(`/api/printers/${id}/pause`, { token, method: 'POST' });
+  };
+
+  const resumePrinter = async (id: string) => {
+    if (!token) return;
+    setErr(null);
+    await apiRequest(`/api/printers/${id}/resume`, { token, method: 'POST' });
+  };
+
+  const cancelPrinter = async (id: string) => {
+    if (!token) return;
+    setErr(null);
+    await apiRequest(`/api/printers/${id}/cancel`, { token, method: 'POST' });
+  };
+
   return (
     <AppShell>
       <div className="flex items-center justify-between">
@@ -170,6 +188,18 @@ export default function PrintersPage() {
                   </button>
                   <button className="rounded bg-red-950/40 px-2 py-2 text-xs" onClick={() => void removePrinter(p.id)}>
                     Remove
+                  </button>
+                </div>
+
+                <div className="mt-2 grid grid-cols-3 gap-2">
+                  <button className="rounded bg-slate-950 px-2 py-2 text-xs" onClick={() => void pausePrinter(p.id)}>
+                    Pause
+                  </button>
+                  <button className="rounded bg-slate-950 px-2 py-2 text-xs" onClick={() => void resumePrinter(p.id)}>
+                    Resume
+                  </button>
+                  <button className="rounded bg-red-950/40 px-2 py-2 text-xs" onClick={() => void cancelPrinter(p.id)}>
+                    Cancel
                   </button>
                 </div>
               </div>

@@ -5,33 +5,6 @@ const schema = z.object({
   PORT: z.coerce.number().int().positive().default(3001),
   BASE_URL_PUBLIC: z.string().url().default('http://localhost:3001'),
 
-  ENABLE_WRITE_ACTIONS: z
-    .string()
-    .optional()
-    .transform((v) => {
-      if (v === undefined) return false;
-      const s = v.trim().toLowerCase();
-      return !(s === '0' || s === 'false' || s === 'no');
-    }),
-
-  ENABLE_DEV_BOOTSTRAP: z
-    .string()
-    .optional()
-    .transform((v) => {
-      if (v === undefined) return false;
-      const s = v.trim().toLowerCase();
-      return !(s === '0' || s === 'false' || s === 'no');
-    }),
-
-  BACKEND_READ_ONLY: z
-    .string()
-    .optional()
-    .transform((v) => {
-      if (v === undefined) return process.env.NODE_ENV === 'production';
-      const s = v.trim().toLowerCase();
-      return !(s === '0' || s === 'false' || s === 'no');
-    }),
-
   JWT_SECRET: z.string().min(16),
 
   TELEGRAM_BOT_TOKEN: z.string().min(10),
