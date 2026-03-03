@@ -9,7 +9,24 @@ import { useAuth } from '../auth/auth_context';
 import { apiRequest } from '../lib/api';
 import { connectBackendWs } from '../lib/ws';
 
-type StatusFilter = 'all' | 'completed' | 'error' | 'cancelled';
+type StatusFilter = 'all' | 'completed' | 'error';
+
+const PAGE_SIZE = 20;
+
+function fmtDateTime(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function fmtDur(sec: number | null): string {
+  if (sec === null) return '-';
+  const s = Math.max(0, Math.floor(sec));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+}
 
 export default function HistoryPage() {
   const { token } = useAuth();
@@ -18,6 +35,8 @@ export default function HistoryPage() {
   const [status, setStatus] = useState<StatusFilter>('all');
   const [history, setHistory] = useState<PrintHistoryDto[]>([]);
   const [printers, setPrinters] = useState<PrinterDto[]>([]);
+  const [pagesLoaded, setPagesLoaded] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
 
   const printerNameById = useMemo(() => {
     const m = new Map<string, string>();
@@ -25,7 +44,7 @@ export default function HistoryPage() {
     return m;
   }, [printers]);
 
-  const load = async () => {
+  const load = async (opts?: { reset?: boolean; pages?: number }) => {
     if (!token) return;
     setErr(null);
 
@@ -34,8 +53,13 @@ export default function HistoryPage() {
     });
     setPrinters(p.printers);
 
+    const reset = opts?.reset ?? false;
+    const nextPagesLoaded =
+      typeof opts?.pages === 'number' ? opts.pages : reset ? 1 : pagesLoaded;
+    const limit = PAGE_SIZE * nextPagesLoaded;
+
     const qs = new URLSearchParams({
-      limit: '50',
+      limit: String(limit),
       offset: '0',
       status,
     });
@@ -44,11 +68,20 @@ export default function HistoryPage() {
       `/api/history?${qs.toString()}`,
       { token },
     );
+    setPagesLoaded(nextPagesLoaded);
     setHistory(h.history);
+    setHasMore(h.history.length === limit);
+  };
+
+  const loadMore = async () => {
+    if (!token) return;
+    const next = pagesLoaded + 1;
+    await load({ pages: next });
   };
 
   useEffect(() => {
-    void load();
+    setPagesLoaded(1);
+    void load({ reset: true });
   }, [token, status]);
 
   useEffect(() => {
@@ -64,9 +97,19 @@ export default function HistoryPage() {
         const p = ev.payload as any;
         const h = p?.history as PrintHistoryDto | undefined;
         if (!h) return;
+
+        if (status !== 'all' && h.status !== status) return;
+
         setHistory((prev) => {
-          const next = [h, ...prev.filter((x) => x.id !== h.id)];
-          return next.slice(0, 50);
+          const maxItems = PAGE_SIZE * pagesLoaded;
+          const idx = prev.findIndex((x) => x.id === h.id);
+          if (idx !== -1) {
+            const copy = [...prev];
+            copy[idx] = h;
+            return copy;
+          }
+          const next = [h, ...prev];
+          return next.slice(0, maxItems);
         });
       },
     });
@@ -75,7 +118,7 @@ export default function HistoryPage() {
       closed = true;
       conn.close();
     };
-  }, [token]);
+  }, [token, status, pagesLoaded]);
 
   return (
     <AppShell>
@@ -83,7 +126,7 @@ export default function HistoryPage() {
         <div className="text-sm font-medium">History</div>
         <button
           className="rounded bg-slate-950 px-3 py-2 text-xs"
-          onClick={() => void load()}
+          onClick={() => void load({ reset: true })}
         >
           Refresh
         </button>
@@ -105,7 +148,6 @@ export default function HistoryPage() {
               <option value="all">all</option>
               <option value="completed">completed</option>
               <option value="error">error</option>
-              <option value="cancelled">cancelled</option>
             </select>
           </div>
 
@@ -123,13 +165,17 @@ export default function HistoryPage() {
                   printer: {printerNameById.get(h.printerId) ?? h.printerId}
                 </div>
                 <div className="mt-1 text-slate-400">
-                  startedAt: {h.startedAt}
+                  startedAt: {fmtDateTime(h.startedAt)}
                 </div>
                 {h.endedAt && (
                   <div className="mt-1 text-slate-400">
-                    endedAt: {h.endedAt}
+                    endedAt: {fmtDateTime(h.endedAt)}
                   </div>
                 )}
+                <div className="mt-1 text-slate-400">
+                  duration: {fmtDur(h.printDurationSec)} (total{' '}
+                  {fmtDur(h.totalDurationSec)})
+                </div>
                 {h.errorMessage && (
                   <div className="mt-2 break-all text-red-300">
                     {h.errorMessage}
@@ -139,6 +185,15 @@ export default function HistoryPage() {
             ))}
             {history.length === 0 && (
               <div className="text-xs text-slate-400">No history.</div>
+            )}
+
+            {history.length > 0 && hasMore && (
+              <button
+                className="w-full rounded bg-slate-950 px-3 py-2 text-xs"
+                onClick={() => void loadMore()}
+              >
+                Load more
+              </button>
             )}
           </div>
         </>
