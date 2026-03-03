@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 import type { PrinterDto } from '../lib/dto';
@@ -244,10 +245,10 @@ export default function PrintersPage() {
                 className="rounded border border-slate-800 bg-slate-900/40 p-3"
               >
                 <div className="flex items-start justify-between">
-                  <div>
+                  <Link href={`/printers/${p.id}`} className="block">
                     <div className="text-sm font-medium">{p.displayName}</div>
                     <div className="text-xs text-slate-400">{p.modelName}</div>
-                  </div>
+                  </Link>
                   <div className="text-xs text-slate-400">
                     {p.id.slice(0, 8)}
                   </div>
