@@ -2,6 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { spawnSync } from 'node:child_process';
 import jwt from 'jsonwebtoken';
 
 import { Prisma } from '@prisma/client';
@@ -36,10 +37,11 @@ process.env.PRINTER_API_KEY_ENC_KEY =
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const BACKEND_DIR = path.resolve(__dirname, '..');
-const DEV_DB_ABS = path.join(BACKEND_DIR, 'prisma', 'dev.db');
-const DEV_DB_URL = `file:${DEV_DB_ABS.replace(/\\/g, '/')}`;
 
-process.env.DATABASE_URL = process.env.DATABASE_URL ?? DEV_DB_URL;
+const TEST_DB_ABS = path.join(BACKEND_DIR, 'test-data', 'prisma-test.db');
+const TEST_DB_URL = `file:${TEST_DB_ABS.replace(/\\/g, '/')}`;
+
+process.env.DATABASE_URL = process.env.DATABASE_URL ?? TEST_DB_URL;
 process.env.FILES_DIR = process.env.FILES_DIR ?? './test-data';
 
 const TEST_FILES_DIR_ABS = path.resolve('test-data');
@@ -86,6 +88,35 @@ describe('presets print pipeline (integration)', () => {
 
   beforeAll(async () => {
     ensureDir(TEST_FILES_DIR_ABS);
+
+    // Ensure DB file directory exists and migrations are applied.
+    ensureDir(path.dirname(TEST_DB_ABS));
+
+    const prismaCliJs = path.resolve(
+      BACKEND_DIR,
+      'node_modules',
+      'prisma',
+      'build',
+      'index.js',
+    );
+
+    const mig = spawnSync(
+      process.execPath,
+      [prismaCliJs, 'migrate', 'deploy'],
+      {
+        cwd: BACKEND_DIR,
+        env: { ...process.env, DATABASE_URL: process.env.DATABASE_URL },
+        encoding: 'utf8',
+      },
+    );
+
+    if (mig.status !== 0) {
+      const out = (mig.stdout || '').trim();
+      const err = (mig.stderr || '').trim();
+      throw new Error(
+        `prisma migrate deploy failed (code=${mig.status}): ${(err || out || '').slice(0, 1200)}`,
+      );
+    }
 
     mock = await startMockMoonraker();
     assertMoonrakerTestBaseUrlSafe(mock.baseUrl);
