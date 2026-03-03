@@ -1,15 +1,20 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
+import { CheckCircle2, CircleX, Clock, TriangleAlert } from 'lucide-react';
 
 import type { PrintHistoryDto, PrinterDto } from '../lib/dto';
 
-import { AppShell } from '../components/AppShell';
+import { BottomSheet } from '../components/ui/BottomSheet';
+import { Button } from '../components/ui/Button';
+import { Card } from '../components/ui/Card';
+import { Chip } from '../components/ui/Chip';
 import { useAuth } from '../auth/auth_context';
 import { apiRequest } from '../lib/api';
-import { connectBackendWs } from '../lib/ws';
+import { useWs } from '../ws/ws_context';
 
-type StatusFilter = 'all' | 'completed' | 'error';
+type StatusFilter = 'all' | 'completed' | 'error' | 'cancelled';
 
 const PAGE_SIZE = 20;
 
@@ -28,8 +33,23 @@ function fmtDur(sec: number | null): string {
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
 
+function statusIcon(status: PrintHistoryDto['status']) {
+  if (status === 'completed') return CheckCircle2;
+  if (status === 'error') return TriangleAlert;
+  if (status === 'cancelled') return CircleX;
+  return Clock;
+}
+
+function statusTone(status: PrintHistoryDto['status']): string {
+  if (status === 'completed') return 'text-accentGreen';
+  if (status === 'error') return 'text-accentRed';
+  if (status === 'cancelled') return 'text-textMuted';
+  return 'text-accentAmber';
+}
+
 export default function HistoryPage() {
   const { token } = useAuth();
+  const ws = useWs();
   const [err, setErr] = useState<string | null>(null);
 
   const [status, setStatus] = useState<StatusFilter>('all');
@@ -38,11 +58,19 @@ export default function HistoryPage() {
   const [pagesLoaded, setPagesLoaded] = useState(1);
   const [hasMore, setHasMore] = useState(false);
 
+  const [open, setOpen] = useState(false);
+  const [activeId, setActiveId] = useState<string | null>(null);
+
   const printerNameById = useMemo(() => {
     const m = new Map<string, string>();
     for (const p of printers) m.set(p.id, p.displayName);
     return m;
   }, [printers]);
+
+  const active = useMemo(() => {
+    if (!activeId) return null;
+    return history.find((x) => x.id === activeId) ?? null;
+  }, [activeId, history]);
 
   const load = async (opts?: { reset?: boolean; pages?: number }) => {
     if (!token) return;
@@ -86,50 +114,35 @@ export default function HistoryPage() {
 
   useEffect(() => {
     if (!token) return;
-    let closed = false;
+    return ws.subscribe((ev) => {
+      if (ev.type !== 'HISTORY_EVENT') return;
+      const p = ev.payload as any;
+      const h = p?.history as PrintHistoryDto | undefined;
+      if (!h) return;
 
-    const conn = connectBackendWs({
-      token,
-      onStatus: () => undefined,
-      onEvent: (ev) => {
-        if (closed) return;
-        if (ev.type !== 'HISTORY_EVENT') return;
-        const p = ev.payload as any;
-        const h = p?.history as PrintHistoryDto | undefined;
-        if (!h) return;
+      if (status !== 'all' && h.status !== status) return;
 
-        if (status !== 'all' && h.status !== status) return;
-
-        setHistory((prev) => {
-          const maxItems = PAGE_SIZE * pagesLoaded;
-          const idx = prev.findIndex((x) => x.id === h.id);
-          if (idx !== -1) {
-            const copy = [...prev];
-            copy[idx] = h;
-            return copy;
-          }
-          const next = [h, ...prev];
-          return next.slice(0, maxItems);
-        });
-      },
+      setHistory((prev) => {
+        const maxItems = PAGE_SIZE * pagesLoaded;
+        const idx = prev.findIndex((x) => x.id === h.id);
+        if (idx !== -1) {
+          const copy = [...prev];
+          copy[idx] = h;
+          return copy;
+        }
+        const next = [h, ...prev];
+        return next.slice(0, maxItems);
+      });
     });
-
-    return () => {
-      closed = true;
-      conn.close();
-    };
-  }, [token, status, pagesLoaded]);
+  }, [token, status, pagesLoaded, ws]);
 
   return (
-    <AppShell>
+    <>
       <div className="flex items-center justify-between">
-        <div className="text-sm font-medium">History</div>
-        <button
-          className="rounded bg-slate-950 px-3 py-2 text-xs"
-          onClick={() => void load({ reset: true })}
-        >
+        <div className="text-xs text-textSecondary">History</div>
+        <Button variant="secondary" onClick={() => void load({ reset: true })}>
           Refresh
-        </button>
+        </Button>
       </div>
 
       {!token && (
@@ -139,65 +152,143 @@ export default function HistoryPage() {
 
       {token && (
         <>
-          <div className="mt-3 flex gap-2">
-            <select
-              className="w-full rounded bg-slate-950 p-2 text-xs"
-              value={status}
-              onChange={(e) => setStatus(e.target.value as StatusFilter)}
-            >
-              <option value="all">all</option>
-              <option value="completed">completed</option>
-              <option value="error">error</option>
-            </select>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button type="button" onClick={() => setStatus('all')}>
+              <Chip active={status === 'all'}>All</Chip>
+            </button>
+            <button type="button" onClick={() => setStatus('completed')}>
+              <Chip active={status === 'completed'}>Completed</Chip>
+            </button>
+            <button type="button" onClick={() => setStatus('error')}>
+              <Chip active={status === 'error'}>Error</Chip>
+            </button>
+            <button type="button" onClick={() => setStatus('cancelled')}>
+              <Chip active={status === 'cancelled'}>Cancelled</Chip>
+            </button>
           </div>
 
           <div className="mt-3 space-y-2">
             {history.map((h) => (
-              <div
+              <button
                 key={h.id}
-                className="rounded border border-slate-800 bg-slate-900/40 p-3 text-xs"
+                className="w-full text-left"
+                type="button"
+                onClick={() => {
+                  setActiveId(h.id);
+                  setOpen(true);
+                }}
               >
-                <div className="flex items-start justify-between">
-                  <div className="font-medium">{h.filename}</div>
-                  <div className="text-slate-400">{h.status}</div>
-                </div>
-                <div className="mt-1 text-slate-400">
-                  printer: {printerNameById.get(h.printerId) ?? h.printerId}
-                </div>
-                <div className="mt-1 text-slate-400">
-                  startedAt: {fmtDateTime(h.startedAt)}
-                </div>
-                {h.endedAt && (
-                  <div className="mt-1 text-slate-400">
-                    endedAt: {fmtDateTime(h.endedAt)}
+                <Card className="p-3">
+                  <div className="flex items-start gap-3">
+                    <div className={`mt-0.5 shrink-0 ${statusTone(h.status)}`}>
+                      {(() => {
+                        const Ico = statusIcon(h.status);
+                        return <Ico size={18} />;
+                      })()}
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-[14px] font-semibold text-textPrimary">
+                        {h.filename}
+                      </div>
+                      <div className="mt-0.5 text-xs text-textSecondary">
+                        {printerNameById.get(h.printerId) ?? h.printerId}
+                      </div>
+
+                      <div className="mt-2 flex items-center justify-between gap-3 text-[11px] text-textMuted">
+                        <div>{fmtDateTime(h.startedAt)}</div>
+                        <div>{fmtDur(h.printDurationSec)}</div>
+                      </div>
+                    </div>
                   </div>
-                )}
-                <div className="mt-1 text-slate-400">
-                  duration: {fmtDur(h.printDurationSec)} (total{' '}
-                  {fmtDur(h.totalDurationSec)})
-                </div>
-                {h.errorMessage && (
-                  <div className="mt-2 break-all text-red-300">
-                    {h.errorMessage}
-                  </div>
-                )}
-              </div>
+                </Card>
+              </button>
             ))}
             {history.length === 0 && (
-              <div className="text-xs text-slate-400">No history.</div>
+              <div className="text-xs text-textSecondary">No history.</div>
             )}
 
             {history.length > 0 && hasMore && (
-              <button
-                className="w-full rounded bg-slate-950 px-3 py-2 text-xs"
-                onClick={() => void loadMore()}
-              >
+              <Button variant="secondary" onClick={() => void loadMore()}>
                 Load more
-              </button>
+              </Button>
             )}
           </div>
+
+          <BottomSheet
+            open={open}
+            onClose={() => setOpen(false)}
+            title="Job details"
+          >
+            {!active && (
+              <div className="text-xs text-textSecondary">No job selected.</div>
+            )}
+
+            {active && (
+              <div className="space-y-3">
+                <div className="rounded-card border border-border/70 bg-surface2 p-3 text-xs">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="truncate font-medium text-textPrimary">
+                        {active.filename}
+                      </div>
+                      <div className="mt-0.5 text-textSecondary">
+                        {printerNameById.get(active.printerId) ??
+                          active.printerId}
+                      </div>
+                    </div>
+                    <div className={`shrink-0 ${statusTone(active.status)}`}>
+                      {active.status}
+                    </div>
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    <div className="rounded-btn border border-border/70 bg-surface p-2">
+                      <div className="text-textMuted">Start</div>
+                      <div className="text-textPrimary">
+                        {fmtDateTime(active.startedAt)}
+                      </div>
+                    </div>
+                    <div className="rounded-btn border border-border/70 bg-surface p-2">
+                      <div className="text-textMuted">End</div>
+                      <div className="text-textPrimary">
+                        {active.endedAt ? fmtDateTime(active.endedAt) : '—'}
+                      </div>
+                    </div>
+                    <div className="rounded-btn border border-border/70 bg-surface p-2">
+                      <div className="text-textMuted">Duration</div>
+                      <div className="text-textPrimary">
+                        {fmtDur(active.printDurationSec)}
+                      </div>
+                    </div>
+                    <div className="rounded-btn border border-border/70 bg-surface p-2">
+                      <div className="text-textMuted">Total</div>
+                      <div className="text-textPrimary">
+                        {fmtDur(active.totalDurationSec)}
+                      </div>
+                    </div>
+                  </div>
+
+                  {active.errorMessage && (
+                    <div className="mt-3 break-words rounded-btn border border-border/70 bg-surface p-2 text-textSecondary">
+                      <div className="text-textMuted">Error</div>
+                      <div className="mt-1 text-accentRed">
+                        {active.errorMessage}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <Link href={`/printers/${active.printerId}`} className="block">
+                  <Button className="w-full" variant="secondary">
+                    Open printer
+                  </Button>
+                </Link>
+              </div>
+            )}
+          </BottomSheet>
         </>
       )}
-    </AppShell>
+    </>
   );
 }

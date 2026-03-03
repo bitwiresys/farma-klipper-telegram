@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 import Script from 'next/script';
 import type { ReactNode } from 'react';
 
-import { AuthProvider } from './auth/auth_context';
+import { ClientRoot } from './components/ClientRoot';
 
 export const metadata: Metadata = {
   title: 'Farma',
@@ -25,7 +25,7 @@ export default function RootLayout({
         className="min-h-screen bg-bg font-sans text-textPrimary"
         data-app-version={process.env.NEXT_PUBLIC_APP_VERSION ?? ''}
       >
-        <AuthProvider>{children}</AuthProvider>
+        <ClientRoot>{children}</ClientRoot>
       </body>
     </html>
   );

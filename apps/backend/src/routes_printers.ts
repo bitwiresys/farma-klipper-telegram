@@ -3,7 +3,68 @@ import type { FastifyInstance } from 'fastify';
 import { CreatePrinterSchema, UpdatePrinterSchema } from '@farma/shared';
 
 import { prisma } from './prisma.js';
+import { MoonrakerHttp } from './moonraker_http.js';
 import { printerRuntime } from './printer_runtime.js';
+
+function normalizeBaseUrl(x: unknown): string | null {
+  if (typeof x !== 'string') return null;
+  const s = x.trim();
+  if (!s) return null;
+  if (!/^https?:\/\//i.test(s)) return null;
+  return s.replace(/\/+$/, '');
+}
+
+function normalizeApiKey(x: unknown): string | null {
+  if (typeof x !== 'string') return null;
+  const s = x.trim();
+  if (!s) return null;
+  return s;
+}
+
+async function detectSpecs(http: MoonrakerHttp): Promise<{
+  bedX: number | null;
+  bedY: number | null;
+  bedZ: number | null;
+  nozzleDiameter: number | null;
+}> {
+  const toolheadResp = (await http.queryObjects(['toolhead'])) as any;
+  const configResp = (await http.queryObjects(['configfile'])) as any;
+
+  const toolhead =
+    toolheadResp?.result?.status?.toolhead ?? toolheadResp?.status?.toolhead;
+  const axisMin = toolhead?.axis_minimum;
+  const axisMax = toolhead?.axis_maximum;
+
+  const bedX =
+    Array.isArray(axisMin) && Array.isArray(axisMax)
+      ? Number(axisMax[0]) - Number(axisMin[0])
+      : null;
+  const bedY =
+    Array.isArray(axisMin) && Array.isArray(axisMax)
+      ? Number(axisMax[1]) - Number(axisMin[1])
+      : null;
+  const bedZ =
+    Array.isArray(axisMin) && Array.isArray(axisMax)
+      ? Number(axisMax[2]) - Number(axisMin[2])
+      : null;
+
+  const nozzleDiameter =
+    Number(
+      configResp?.result?.status?.configfile?.settings?.extruder
+        ?.nozzle_diameter ??
+        configResp?.status?.configfile?.settings?.extruder?.nozzle_diameter,
+    ) || null;
+
+  return {
+    bedX: bedX !== null && Number.isFinite(bedX) ? bedX : null,
+    bedY: bedY !== null && Number.isFinite(bedY) ? bedY : null,
+    bedZ: bedZ !== null && Number.isFinite(bedZ) ? bedZ : null,
+    nozzleDiameter:
+      nozzleDiameter !== null && Number.isFinite(nozzleDiameter)
+        ? nozzleDiameter
+        : null,
+  };
+}
 
 export async function registerPrintersRoutes(app: FastifyInstance) {
   app.get('/api/printers', async (_req, reply) => {
@@ -33,6 +94,26 @@ export async function registerPrintersRoutes(app: FastifyInstance) {
         snapshot: printerRuntime.getSnapshot(p.id),
       })),
     });
+  });
+
+  app.post('/api/printers/test-draft', async (req, reply) => {
+    const baseUrl = normalizeBaseUrl((req.body as any)?.moonrakerBaseUrl);
+    const apiKey = normalizeApiKey((req.body as any)?.moonrakerApiKey);
+
+    if (!baseUrl || !apiKey) {
+      return reply.code(400).send({
+        error: 'BAD_REQUEST',
+        details: {
+          baseUrl: baseUrl ? undefined : 'Invalid moonrakerBaseUrl',
+          apiKey: apiKey ? undefined : 'Invalid moonrakerApiKey',
+        },
+      });
+    }
+
+    const http = new MoonrakerHttp({ baseUrl, apiKey });
+    const info = await http.get('/server/info');
+    const specs = await detectSpecs(http);
+    return reply.send({ ok: true, info, specs });
   });
 
   app.post('/api/printers', async (req, reply) => {

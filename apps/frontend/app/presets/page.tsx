@@ -5,42 +5,28 @@ import { useEffect, useMemo, useState } from 'react';
 
 import type { PresetDto } from '../lib/dto';
 
-import { AppShell } from '../components/AppShell';
+import { Button } from '../components/ui/Button';
+import { Card } from '../components/ui/Card';
+import { Chip } from '../components/ui/Chip';
+import { EmptyState } from '../components/ui/EmptyState';
 import { useAuth } from '../auth/auth_context';
 import { apiRequest } from '../lib/api';
-import { connectBackendWs } from '../lib/ws';
+import { useWs } from '../ws/ws_context';
 
 type WsEvent = { type: string; payload: any };
 
-function Badge({ children }: { children: string }) {
-  return (
-    <div className="rounded bg-slate-950 px-2 py-1 text-[11px] text-slate-200">
-      {children}
-    </div>
-  );
-}
-
-function fmtModels(models: string[]): string {
-  if (models.length === 0) return 'models: any';
-  return models.length <= 3
-    ? `models: ${models.length}`
-    : `models: ${models.length}`;
-}
-
-function fmtNozzles(xs: number[]): string {
-  if (xs.length === 0) return 'nozzle: any';
+function fmtNozzle(xs: number[]): string {
+  if (xs.length === 0) return 'nozzle any';
   const sorted = [...xs].sort((a, b) => a - b);
-  return `nozzle: ${sorted.join(', ')}`;
-}
-
-function fmtBed(minBedX: number, minBedY: number): string {
-  return `bed: ${minBedX}×${minBedY}`;
+  return `${sorted.join(', ')}`;
 }
 
 export default function PresetsPage() {
   const { token } = useAuth();
+  const ws = useWs();
   const [err, setErr] = useState<string | null>(null);
   const [presets, setPresets] = useState<PresetDto[]>([]);
+  const [query, setQuery] = useState('');
 
   const load = async () => {
     if (!token) return;
@@ -57,45 +43,33 @@ export default function PresetsPage() {
 
   useEffect(() => {
     if (!token) return;
-    let closed = false;
-    const conn = connectBackendWs({
-      token,
-      onStatus: () => undefined,
-      onEvent: (ev) => {
-        if (closed) return;
-        const e = ev as WsEvent;
-        if (e.type === 'PRESET_UPDATED') {
-          void load();
-        }
-      },
+    return ws.subscribe((ev) => {
+      const e = ev as WsEvent;
+      if (e.type === 'PRESET_UPDATED') void load();
     });
-    return () => {
-      closed = true;
-      conn.close();
-    };
-  }, [token]);
+  }, [token, ws]);
 
   const sorted = useMemo(() => {
-    return [...presets].sort((a, b) => a.title.localeCompare(b.title));
+    const q = query.trim().toLowerCase();
+    const list = [...presets].sort((a, b) => a.title.localeCompare(b.title));
+    if (!q) return list;
+    return list.filter((p) => {
+      const hay = `${p.title} ${p.plasticType}`.toLowerCase();
+      return hay.includes(q);
+    });
   }, [presets]);
 
   return (
-    <AppShell>
+    <>
       <div className="flex items-center justify-between">
-        <div className="text-sm font-medium">Presets</div>
+        <div className="text-xs text-textSecondary">Presets</div>
         <div className="flex gap-2">
-          <Link
-            href="/presets/new"
-            className="rounded bg-slate-200 px-3 py-2 text-xs font-medium text-slate-950"
-          >
-            New
+          <Link href="/presets/new">
+            <Button variant="primary">+ Add</Button>
           </Link>
-          <button
-            className="rounded bg-slate-950 px-3 py-2 text-xs"
-            onClick={() => void load()}
-          >
+          <Button variant="secondary" onClick={() => void load()}>
             Refresh
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -105,69 +79,92 @@ export default function PresetsPage() {
       {err && <div className="mt-3 break-all text-xs text-red-400">{err}</div>}
 
       {token && (
-        <div className="mt-3 space-y-3">
-          {sorted.map((p) => (
-            <Link
-              key={p.id}
-              href={`/presets/${p.id}`}
-              className="block rounded border border-slate-800 bg-slate-900/40 p-3"
-            >
-              <div className="flex gap-3">
-                <div className="h-16 w-16 shrink-0 overflow-hidden rounded bg-slate-950">
-                  {p.thumbnailUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={p.thumbnailUrl}
-                      alt="thumbnail"
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center text-[10px] text-slate-500">
-                      no thumb
-                    </div>
-                  )}
-                </div>
+        <>
+          <div className="mt-3">
+            <input
+              className="w-full rounded-btn border border-border/70 bg-surface2 p-3 text-xs text-textPrimary placeholder:text-textMuted"
+              placeholder="Search presets…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+          </div>
 
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <div className="truncate text-sm font-medium">
-                        {p.title}
+          <div className="mt-3 space-y-3">
+            {sorted.map((p) => (
+              <Card key={p.id} className="p-3">
+                <div className="flex gap-3">
+                  <div className="h-[72px] w-[72px] shrink-0 overflow-hidden rounded-btn bg-surface2">
+                    {p.thumbnailUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={p.thumbnailUrl}
+                        alt="thumbnail"
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center text-[11px] text-textMuted">
+                        —
                       </div>
-                      <div className="mt-0.5 text-xs text-slate-400">
-                        {p.plasticType}
-                      </div>
-                    </div>
-                    <div
-                      className="h-5 w-5 shrink-0 rounded border border-slate-700"
-                      style={{ background: p.colorHex }}
-                      title={p.colorHex}
-                    />
+                    )}
                   </div>
 
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    <Badge>
-                      {fmtModels(p.compatibilityRules.allowedModelIds)}
-                    </Badge>
-                    <Badge>
-                      {fmtNozzles(p.compatibilityRules.allowedNozzleDiameters)}
-                    </Badge>
-                    <Badge>
-                      {fmtBed(
-                        p.compatibilityRules.minBedX,
-                        p.compatibilityRules.minBedY,
-                      )}
-                    </Badge>
+                  <div className="min-w-0 flex-1">
+                    <Link
+                      href={`/presets/${p.id}`}
+                      className="block truncate text-[14px] font-semibold text-textPrimary"
+                    >
+                      {p.title}
+                    </Link>
+
+                    <div className="mt-1 flex items-center gap-2">
+                      <Chip>{p.plasticType}</Chip>
+                      <div
+                        className="h-4 w-4 rounded-full border border-border/70"
+                        style={{ background: p.colorHex || '#ffffff' }}
+                        aria-label={p.colorHex}
+                      />
+                    </div>
+
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <Chip>
+                        {p.compatibilityRules.allowedModelIds.length > 0
+                          ? 'models'
+                          : 'models any'}
+                      </Chip>
+                      <Chip>
+                        {fmtNozzle(p.compatibilityRules.allowedNozzleDiameters)}
+                      </Chip>
+                      <Chip>
+                        {p.compatibilityRules.minBedX}×
+                        {p.compatibilityRules.minBedY}
+                      </Chip>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col justify-end">
+                    <Link href={`/presets/${p.id}`}>
+                      <Button variant="primary">Print</Button>
+                    </Link>
                   </div>
                 </div>
+              </Card>
+            ))}
+
+            {sorted.length === 0 && (
+              <div className="pt-2">
+                <EmptyState
+                  title="Upload your first preset"
+                  subtitle="Add a .gcode preset to start prints from the library."
+                  actionLabel="Add preset"
+                  onAction={() => {
+                    window.location.href = '/presets/new';
+                  }}
+                />
               </div>
-            </Link>
-          ))}
-          {sorted.length === 0 && (
-            <div className="text-xs text-slate-400">No presets.</div>
-          )}
-        </div>
+            )}
+          </div>
+        </>
       )}
-    </AppShell>
+    </>
   );
 }

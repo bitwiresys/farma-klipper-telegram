@@ -1,11 +1,14 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import type { PrinterDto } from '../lib/dto';
 
-import { AppShell } from '../components/AppShell';
+import { BottomSheet } from '../components/ui/BottomSheet';
+import { Button } from '../components/ui/Button';
+import { Card } from '../components/ui/Card';
+import { EmptyState } from '../components/ui/EmptyState';
 import { useAuth } from '../auth/auth_context';
 import { apiRequest } from '../lib/api';
 
@@ -30,22 +33,30 @@ function fmtXYZ(p?: {
   return `X ${fmtNum(p.x, 2)} Y ${fmtNum(p.y, 2)} Z ${fmtNum(p.z, 2)}`;
 }
 
+function statusText(p: PrinterDto): {
+  text: string;
+  tone: 'ok' | 'warn' | 'bad';
+} {
+  const state = String((p.snapshot as any)?.state ?? 'offline');
+  if (p.needsRekey) return { text: 'Rekey', tone: 'warn' };
+  if (state === 'offline') return { text: 'Offline', tone: 'bad' };
+  if (state === 'printing') return { text: 'Printing', tone: 'ok' };
+  if (state === 'paused') return { text: 'Paused', tone: 'warn' };
+  if (state === 'error') return { text: 'Error', tone: 'bad' };
+  if (state === 'standby') return { text: 'Ready', tone: 'ok' };
+  return { text: 'Not ready', tone: 'warn' };
+}
+
 export default function PrintersPage() {
   const { token } = useAuth();
   const [err, setErr] = useState<string | null>(null);
 
-  const devOnly = process.env.NEXT_PUBLIC_DEV_ONLY === '1';
-
   const [printers, setPrinters] = useState<PrinterDto[]>([]);
-  const [models, setModels] = useState<Array<{ id: string; name: string }>>([]);
 
-  const [newModelName, setNewModelName] = useState('');
-  const [newPrinter, setNewPrinter] = useState({
-    displayName: '',
-    modelId: '',
-    moonrakerBaseUrl: '',
-    moonrakerApiKey: '',
-  });
+  const [actionsOpen, setActionsOpen] = useState(false);
+  const [confirmRemoveOpen, setConfirmRemoveOpen] = useState(false);
+  const [activePrinterId, setActivePrinterId] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
   const load = async () => {
     if (!token) return;
@@ -54,104 +65,64 @@ export default function PrintersPage() {
       token,
     });
     setPrinters(p.printers);
-    const m = await apiRequest<{ models: Array<{ id: string; name: string }> }>(
-      '/api/printer-models',
-      { token },
-    );
-    setModels(m.models);
   };
 
   useEffect(() => {
     void load();
   }, [token]);
 
-  const createModelInline = async () => {
-    if (!token) return;
-    setErr(null);
-    if (!newModelName.trim()) return;
-    await apiRequest('/api/printer-models', {
-      token,
-      method: 'POST',
-      body: { name: newModelName.trim() },
-    });
-    setNewModelName('');
-    await load();
-  };
-
-  const createPrinter = async () => {
-    if (!token) return;
-    setErr(null);
-    await apiRequest('/api/printers', {
-      token,
-      method: 'POST',
-      body: newPrinter,
-    });
-    setNewPrinter({
-      displayName: '',
-      modelId: '',
-      moonrakerBaseUrl: '',
-      moonrakerApiKey: '',
-    });
-    await load();
-  };
-
   const testPrinter = async (id: string) => {
     if (!token) return;
     setErr(null);
-    await apiRequest(`/api/printers/${id}/test`, { token, method: 'POST' });
+    setBusy(true);
+    try {
+      await apiRequest(`/api/printers/${id}/test`, { token, method: 'POST' });
+    } finally {
+      setBusy(false);
+    }
   };
 
   const rescanPrinter = async (id: string) => {
     if (!token) return;
     setErr(null);
-    await apiRequest(`/api/printers/${id}/rescan`, { token, method: 'POST' });
-    await load();
+    setBusy(true);
+    try {
+      await apiRequest(`/api/printers/${id}/rescan`, { token, method: 'POST' });
+      await load();
+    } finally {
+      setBusy(false);
+    }
   };
 
   const removePrinter = async (id: string) => {
     if (!token) return;
     setErr(null);
-    await apiRequest(`/api/printers/${id}`, { token, method: 'DELETE' });
-    await load();
+    setBusy(true);
+    try {
+      await apiRequest(`/api/printers/${id}`, { token, method: 'DELETE' });
+      await load();
+    } finally {
+      setBusy(false);
+    }
   };
 
-  const pausePrinter = async (id: string) => {
-    if (!token) return;
-    setErr(null);
-    await apiRequest(`/api/printers/${id}/pause`, { token, method: 'POST' });
-  };
-
-  const resumePrinter = async (id: string) => {
-    if (!token) return;
-    setErr(null);
-    await apiRequest(`/api/printers/${id}/resume`, { token, method: 'POST' });
-  };
-
-  const cancelPrinter = async (id: string) => {
-    if (!token) return;
-    setErr(null);
-    await apiRequest(`/api/printers/${id}/cancel`, { token, method: 'POST' });
-  };
-
-  const emergencyStopPrinter = async (id: string) => {
-    if (!token) return;
-    setErr(null);
-    await apiRequest(`/api/printers/${id}/emergency_stop`, {
-      token,
-      method: 'POST',
-    });
-  };
+  const active = useMemo(() => {
+    if (!activePrinterId) return null;
+    return printers.find((p) => p.id === activePrinterId) ?? null;
+  }, [activePrinterId, printers]);
 
   return (
-    <AppShell>
+    <>
       <div className="flex items-center justify-between">
-        <div className="text-sm font-medium">Printers</div>
-        <button
-          className="rounded bg-slate-950 px-3 py-2 text-xs"
-          onClick={() => void load()}
-        >
-          Refresh
-        </button>
+        <div className="text-xs text-textSecondary">Printers</div>
+        <div className="flex gap-2">
+          <Link href="/printers/new">
+            <Button variant="primary">+ Add</Button>
+          </Link>
+          <Button variant="secondary" onClick={() => void load()}>
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {!token && (
@@ -160,215 +131,136 @@ export default function PrintersPage() {
       {err && <div className="mt-3 break-all text-xs text-red-400">{err}</div>}
 
       {token && (
-        <>
-          <div className="mt-3 rounded border border-slate-800 bg-slate-900/40 p-3">
-            <div className="text-xs font-medium">Add model (inline)</div>
-            <div className="mt-2 flex gap-2">
-              <input
-                className="flex-1 rounded bg-slate-950 p-2 text-xs"
-                placeholder="Model name"
-                value={newModelName}
-                onChange={(e) => setNewModelName(e.target.value)}
-              />
-              <button
-                className="rounded bg-slate-200 px-3 py-2 text-xs font-medium text-slate-950"
-                onClick={() => void createModelInline()}
-              >
-                Create
-              </button>
-            </div>
-          </div>
+        <div className="mt-3 space-y-3">
+          {printers.map((p) => {
+            const st = statusText(p);
+            const dotClass =
+              st.tone === 'ok'
+                ? 'bg-accentGreen'
+                : st.tone === 'bad'
+                  ? 'bg-accentRed'
+                  : 'bg-accentAmber';
 
-          <div className="mt-3 rounded border border-slate-800 bg-slate-900/40 p-3">
-            <div className="text-xs font-medium">Add printer</div>
-            <div className="mt-2 grid gap-2">
-              <input
-                className="w-full rounded bg-slate-950 p-2 text-xs"
-                placeholder="displayName"
-                value={newPrinter.displayName}
-                onChange={(e) =>
-                  setNewPrinter((p) => ({ ...p, displayName: e.target.value }))
-                }
-              />
-              <select
-                className="w-full rounded bg-slate-950 p-2 text-xs"
-                value={newPrinter.modelId}
-                onChange={(e) =>
-                  setNewPrinter((p) => ({ ...p, modelId: e.target.value }))
-                }
-              >
-                <option value="">model...</option>
-                {models.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.name}
-                  </option>
-                ))}
-              </select>
-              <input
-                className="w-full rounded bg-slate-950 p-2 text-xs"
-                placeholder="moonrakerBaseUrl (http://...:7125)"
-                value={newPrinter.moonrakerBaseUrl}
-                onChange={(e) =>
-                  setNewPrinter((p) => ({
-                    ...p,
-                    moonrakerBaseUrl: e.target.value,
-                  }))
-                }
-              />
-              <input
-                className="w-full rounded bg-slate-950 p-2 text-xs"
-                placeholder="moonrakerApiKey"
-                value={newPrinter.moonrakerApiKey}
-                onChange={(e) =>
-                  setNewPrinter((p) => ({
-                    ...p,
-                    moonrakerApiKey: e.target.value,
-                  }))
-                }
-              />
-              <div className="text-xs text-slate-400">
-                apiKey will not be displayed after save.
-              </div>
-              <button
-                className="w-full rounded bg-slate-200 px-3 py-2 text-xs font-medium text-slate-950"
-                onClick={() => void createPrinter()}
-              >
-                Create
-              </button>
-            </div>
-          </div>
-
-          <div className="mt-3 space-y-3">
-            {printers.map((p) => (
-              <div
-                key={p.id}
-                className="rounded border border-slate-800 bg-slate-900/40 p-3"
-              >
-                <div className="flex items-start justify-between">
-                  <Link href={`/printers/${p.id}`} className="block">
-                    <div className="text-sm font-medium">{p.displayName}</div>
-                    <div className="text-xs text-slate-400">{p.modelName}</div>
+            return (
+              <Card key={p.id} className="p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <Link href={`/printers/${p.id}`} className="min-w-0 flex-1">
+                    <div className="truncate text-[14px] font-semibold text-textPrimary">
+                      {p.displayName}
+                    </div>
+                    <div className="mt-0.5 text-xs text-textSecondary">
+                      {p.modelName}
+                    </div>
+                    <div className="mt-2 flex items-center gap-2 text-xs text-textSecondary">
+                      <div className={`h-2 w-2 rounded-full ${dotClass}`} />
+                      <div>{st.text}</div>
+                    </div>
                   </Link>
-                  <div className="text-xs text-slate-400">
-                    {p.id.slice(0, 8)}
-                  </div>
-                </div>
 
-                <div className="mt-2 text-xs text-slate-300">
-                  <div className="text-slate-400">rekey</div>
-                  <div>{p.needsRekey ? 'needsRekey=true' : 'ok'}</div>
-                </div>
-
-                <div className="mt-2 grid grid-cols-3 gap-2">
                   <button
-                    className="rounded bg-slate-950 px-2 py-2 text-xs"
-                    onClick={() => void testPrinter(p.id)}
-                  >
-                    Test
-                  </button>
-                  <button
-                    className="rounded bg-slate-950 px-2 py-2 text-xs"
-                    onClick={() => void rescanPrinter(p.id)}
-                  >
-                    Rescan
-                  </button>
-                  <button
-                    className="rounded bg-red-950/40 px-2 py-2 text-xs"
-                    onClick={() => void removePrinter(p.id)}
-                  >
-                    Remove
-                  </button>
-                </div>
-
-                <div className="mt-2">
-                  <button
-                    className="w-full rounded bg-red-950 px-2 py-2 text-xs"
+                    className="h-11 w-11 rounded-btn border border-border/70 bg-surface2 text-xs text-textSecondary"
                     onClick={() => {
-                      if (
-                        !confirm(
-                          'EMERGENCY STOP? This will immediately stop the printer.',
-                        )
-                      )
-                        return;
-                      void emergencyStopPrinter(p.id);
+                      setActivePrinterId(p.id);
+                      setActionsOpen(true);
                     }}
+                    type="button"
+                    aria-label="Actions"
                   >
-                    Emergency stop
+                    ⋯
                   </button>
                 </div>
+              </Card>
+            );
+          })}
 
-                {devOnly && (
-                  <div className="mt-2 grid grid-cols-3 gap-2">
-                    <button
-                      className="rounded bg-slate-950 px-2 py-2 text-xs"
-                      onClick={() => void pausePrinter(p.id)}
-                    >
-                      Pause
-                    </button>
-                    <button
-                      className="rounded bg-slate-950 px-2 py-2 text-xs"
-                      onClick={() => void resumePrinter(p.id)}
-                    >
-                      Resume
-                    </button>
-                    <button
-                      className="rounded bg-red-950/40 px-2 py-2 text-xs"
-                      onClick={() => void cancelPrinter(p.id)}
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                )}
+          {printers.length === 0 && (
+            <EmptyState
+              title="Add your first printer"
+              subtitle="Connect Moonraker to start live monitoring and printing."
+              actionLabel="Add printer"
+              onAction={() => {
+                window.location.href = '/printers/new';
+              }}
+            />
+          )}
 
-                <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
-                  <div className="rounded bg-slate-950 p-2">
-                    <div className="text-slate-400">XYZ live</div>
-                    <div>{fmtXYZ(p.snapshot.position?.live)}</div>
-                  </div>
-                  <div className="rounded bg-slate-950 p-2">
-                    <div className="text-slate-400">XYZ cmd</div>
-                    <div>{fmtXYZ(p.snapshot.position?.commanded)}</div>
-                  </div>
-                  <div className="rounded bg-slate-950 p-2">
-                    <div className="text-slate-400">speed</div>
-                    <div>
-                      v {fmtNum(p.snapshot.speed?.liveVelocityMmS, 1)} / g{' '}
-                      {fmtNum(p.snapshot.speed?.gcodeSpeedMmS, 1)} mm/s
-                    </div>
-                    <div className="text-slate-400">
-                      factor {fmtPct01(p.snapshot.speed?.speedFactor)}
-                    </div>
-                  </div>
-                  <div className="rounded bg-slate-950 p-2">
-                    <div className="text-slate-400">flow / fan</div>
-                    <div>flow {fmtPct01(p.snapshot.speed?.flowFactor)}</div>
-                    <div>
-                      fan {fmtPct01(p.snapshot.fans?.part?.speed)}
-                      {p.snapshot.fans?.part?.rpm !== null &&
-                        p.snapshot.fans?.part?.rpm !== undefined &&
-                        ` (${fmtNum(p.snapshot.fans?.part?.rpm, 0)} rpm)`}
-                    </div>
-                  </div>
-                  <div className="rounded bg-slate-950 p-2">
-                    <div className="text-slate-400">chamber</div>
-                    <div>{fmtNum(p.snapshot.chamberTemp, 1)}</div>
-                  </div>
-                  <div className="rounded bg-slate-950 p-2">
-                    <div className="text-slate-400">limits</div>
-                    <div>
-                      v {fmtNum(p.snapshot.limits?.maxVelocity, 0)} a{' '}
-                      {fmtNum(p.snapshot.limits?.maxAccel, 0)}
-                    </div>
-                  </div>
-                </div>
+          <BottomSheet
+            open={actionsOpen}
+            onClose={() => setActionsOpen(false)}
+            title={active ? active.displayName : 'Printer'}
+          >
+            <div className="space-y-2">
+              <Button
+                variant="primary"
+                onClick={() => {
+                  if (!activePrinterId) return;
+                  void testPrinter(activePrinterId);
+                }}
+                disabled={!activePrinterId || busy}
+              >
+                {busy ? 'Testing…' : 'Test connection'}
+              </Button>
+
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  if (!activePrinterId) return;
+                  void rescanPrinter(activePrinterId);
+                }}
+                disabled={!activePrinterId || busy}
+              >
+                Rescan specs
+              </Button>
+
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  setConfirmRemoveOpen(true);
+                }}
+                disabled={!activePrinterId || busy}
+              >
+                Remove
+              </Button>
+            </div>
+          </BottomSheet>
+
+          <BottomSheet
+            open={confirmRemoveOpen}
+            onClose={() => setConfirmRemoveOpen(false)}
+            title="Remove printer?"
+          >
+            <div className="space-y-3">
+              <div className="text-xs text-textSecondary">
+                {active ? active.displayName : 'Printer'}
               </div>
-            ))}
-            {printers.length === 0 && (
-              <div className="text-xs text-slate-400">No printers.</div>
-            )}
-          </div>
-        </>
+              <div className="text-xs text-textMuted">
+                History and presets will stay.
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  variant="secondary"
+                  onClick={() => setConfirmRemoveOpen(false)}
+                  disabled={busy}
+                >
+                  Keep
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={() => {
+                    if (!activePrinterId) return;
+                    void removePrinter(activePrinterId);
+                    setConfirmRemoveOpen(false);
+                    setActionsOpen(false);
+                  }}
+                  disabled={!activePrinterId || busy}
+                >
+                  Remove
+                </Button>
+              </div>
+            </div>
+          </BottomSheet>
+        </div>
       )}
-    </AppShell>
+    </>
   );
 }

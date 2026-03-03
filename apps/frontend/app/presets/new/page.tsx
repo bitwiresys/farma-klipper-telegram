@@ -5,7 +5,8 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { CreatePresetSchema } from '../../lib/schemas';
 
-import { AppShell } from '../../components/AppShell';
+import { Button } from '../../components/ui/Button';
+import { Card } from '../../components/ui/Card';
 import { useAuth } from '../../auth/auth_context';
 import {
   apiRequest,
@@ -28,6 +29,10 @@ export default function NewPresetPage() {
   const { token } = useAuth();
   const [err, setErr] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+
+  const [filePickerId] = useState(
+    () => `file_${Math.random().toString(16).slice(2)}`,
+  );
 
   const [models, setModels] = useState<Array<{ id: string; name: string }>>([]);
 
@@ -82,6 +87,8 @@ export default function NewPresetPage() {
     return [...allowedNozzleDiameters].sort((a, b) => a - b);
   }, [allowedNozzleDiameters]);
 
+  const [saving, setSaving] = useState(false);
+
   const submit = async () => {
     if (!token) return;
     setErr(null);
@@ -117,6 +124,7 @@ export default function NewPresetPage() {
     form.append('data', JSON.stringify(parsed.data));
 
     try {
+      setSaving(true);
       const res = await apiRequestForm<{ preset: PresetDto }>('/api/presets', {
         token,
         form,
@@ -131,18 +139,17 @@ export default function NewPresetPage() {
           ? JSON.stringify(parsedBody)
           : ae.bodyText,
       );
+    } finally {
+      setSaving(false);
     }
   };
 
   return (
-    <AppShell>
+    <>
       <div className="flex items-center justify-between">
-        <div className="text-sm font-medium">New preset</div>
-        <Link
-          href="/presets"
-          className="rounded bg-slate-950 px-3 py-2 text-xs"
-        >
-          Back
+        <div className="text-xs text-textSecondary">Add preset</div>
+        <Link href="/presets">
+          <Button variant="ghost">Cancel</Button>
         </Link>
       </div>
 
@@ -154,22 +161,37 @@ export default function NewPresetPage() {
         <div className="mt-3 space-y-3">
           {err && <div className="break-all text-xs text-red-400">{err}</div>}
 
-          <div className="rounded border border-slate-800 bg-slate-900/40 p-3">
-            <div className="text-xs font-medium">GCode file</div>
-            <input
-              className="mt-2 w-full rounded bg-slate-950 p-2 text-xs"
-              type="file"
-              accept=".gcode"
-              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-            />
-          </div>
+          <Card className="p-3">
+            <div className="text-xs font-medium text-textPrimary">
+              Upload gcode
+            </div>
+            <div className="mt-2 rounded-card border border-border/70 bg-surface2 p-3">
+              <div className="text-xs text-textSecondary">
+                {file ? file.name : 'No file selected'}
+              </div>
+              <div className="mt-3">
+                <label htmlFor={filePickerId} className="block">
+                  <Button className="w-full" variant="primary">
+                    Choose file (.gcode)
+                  </Button>
+                </label>
+                <input
+                  id={filePickerId}
+                  className="hidden"
+                  type="file"
+                  accept=".gcode"
+                  onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                />
+              </div>
+            </div>
+          </Card>
 
-          <div className="rounded border border-slate-800 bg-slate-900/40 p-3">
-            <div className="text-xs font-medium">Info</div>
+          <Card className="p-3">
+            <div className="text-xs font-medium text-textPrimary">Info</div>
             <div className="mt-2 grid gap-2">
               <input
-                className="w-full rounded bg-slate-950 p-2 text-xs"
-                placeholder="title"
+                className="w-full rounded-btn border border-border/70 bg-surface2 p-3 text-xs"
+                placeholder="Title"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
               />
@@ -180,8 +202,8 @@ export default function NewPresetPage() {
               )}
 
               <input
-                className="w-full rounded bg-slate-950 p-2 text-xs"
-                placeholder="plasticType"
+                className="w-full rounded-btn border border-border/70 bg-surface2 p-3 text-xs"
+                placeholder="Plastic type"
                 value={plasticType}
                 onChange={(e) => setPlasticType(e.target.value)}
               />
@@ -193,13 +215,13 @@ export default function NewPresetPage() {
 
               <div className="flex gap-2">
                 <input
-                  className="flex-1 rounded bg-slate-950 p-2 text-xs"
+                  className="flex-1 rounded-btn border border-border/70 bg-surface2 p-3 text-xs"
                   placeholder="#ffffff"
                   value={colorHex}
                   onChange={(e) => setColorHex(e.target.value)}
                 />
                 <input
-                  className="h-9 w-12 rounded border border-slate-800 bg-slate-950"
+                  className="h-10 w-12 rounded-btn border border-border/70 bg-surface2"
                   type="color"
                   value={colorHex}
                   onChange={(e) => setColorHex(e.target.value)}
@@ -212,8 +234,8 @@ export default function NewPresetPage() {
               )}
 
               <textarea
-                className="w-full rounded bg-slate-950 p-2 text-xs"
-                placeholder="description (optional)"
+                className="w-full rounded-btn border border-border/70 bg-surface2 p-3 text-xs"
+                placeholder="Description (optional)"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows={3}
@@ -224,12 +246,16 @@ export default function NewPresetPage() {
                 </div>
               )}
             </div>
-          </div>
+          </Card>
 
-          <div className="rounded border border-slate-800 bg-slate-900/40 p-3">
-            <div className="text-xs font-medium">Compatibility rules</div>
+          <Card className="p-3">
+            <div className="text-xs font-medium text-textPrimary">
+              Compatibility
+            </div>
 
-            <div className="mt-3 text-xs text-slate-400">Allowed models</div>
+            <div className="mt-3 text-xs text-textSecondary">
+              Allowed models
+            </div>
             <div className="mt-2 grid gap-2">
               {models.map((m) => (
                 <label key={m.id} className="flex items-center gap-2 text-xs">
@@ -238,28 +264,28 @@ export default function NewPresetPage() {
                     checked={allowedModelIds.includes(m.id)}
                     onChange={() => toggleModel(m.id)}
                   />
-                  <span>{m.name}</span>
+                  <span className="text-textPrimary">{m.name}</span>
                 </label>
               ))}
               {models.length === 0 && (
-                <div className="text-xs text-slate-400">
+                <div className="text-xs text-textSecondary">
                   No models yet. Create models in Printers tab.
                 </div>
               )}
             </div>
 
-            <div className="mt-3 text-xs text-slate-400">
-              Allowed nozzle diameters
+            <div className="mt-3 text-xs text-textSecondary">
+              Allowed nozzle
             </div>
             <div className="mt-2 flex flex-wrap gap-2">
               {[0.2, 0.4, 0.6, 0.8].map((n) => (
                 <button
                   key={n}
                   className={
-                    'rounded px-3 py-2 text-xs ' +
+                    'rounded-btn border border-border/70 px-3 py-2 text-xs ' +
                     (allowedNozzleDiameters.includes(n)
-                      ? 'bg-slate-200 text-slate-950'
-                      : 'bg-slate-950 text-slate-200')
+                      ? 'bg-accentCyan/10 text-accentCyan'
+                      : 'bg-surface2 text-textSecondary')
                   }
                   onClick={() => toggleNozzle(n)}
                   type="button"
@@ -269,20 +295,16 @@ export default function NewPresetPage() {
               ))}
             </div>
 
-            <div className="mt-2 flex gap-2">
+            <div className="mt-3 flex gap-2">
               <input
-                className="flex-1 rounded bg-slate-950 p-2 text-xs"
+                className="flex-1 rounded-btn border border-border/70 bg-surface2 p-3 text-xs"
                 placeholder="custom nozzle (e.g. 0.5)"
                 value={customNozzle}
                 onChange={(e) => setCustomNozzle(e.target.value)}
               />
-              <button
-                className="rounded bg-slate-950 px-3 py-2 text-xs"
-                onClick={() => addCustomNozzle()}
-                type="button"
-              >
+              <Button variant="secondary" onClick={() => addCustomNozzle()}>
                 Add
-              </button>
+              </Button>
             </div>
             {fieldErrors['compatibilityRules.allowedNozzleDiameters'] && (
               <div className="text-xs text-red-400">
@@ -292,36 +314,48 @@ export default function NewPresetPage() {
               </div>
             )}
 
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              <div>
-                <div className="text-xs text-slate-400">minBedX</div>
-                <input
-                  className="mt-1 w-full rounded bg-slate-950 p-2 text-xs"
-                  type="number"
-                  value={minBedX}
-                  onChange={(e) => setMinBedX(Number(e.target.value))}
-                />
-              </div>
-              <div>
-                <div className="text-xs text-slate-400">minBedY</div>
-                <input
-                  className="mt-1 w-full rounded bg-slate-950 p-2 text-xs"
-                  type="number"
-                  value={minBedY}
-                  onChange={(e) => setMinBedY(Number(e.target.value))}
-                />
-              </div>
+            <div className="mt-3 text-xs text-textSecondary">Min bed size</div>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <input
+                className="w-full rounded-btn border border-border/70 bg-surface2 p-3 text-xs"
+                placeholder="minBedX"
+                value={minBedX}
+                type="number"
+                onChange={(e) => setMinBedX(Number(e.target.value))}
+              />
+              <input
+                className="w-full rounded-btn border border-border/70 bg-surface2 p-3 text-xs"
+                placeholder="minBedY"
+                value={minBedY}
+                type="number"
+                onChange={(e) => setMinBedY(Number(e.target.value))}
+              />
             </div>
+          </Card>
+
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <Button
+              variant="secondary"
+              onClick={() => window.history.back()}
+              disabled={saving}
+            >
+              Cancel
+            </Button>
+            <Button
+              className="w-full"
+              variant="primary"
+              onClick={() => void submit()}
+              disabled={!token || saving}
+            >
+              {saving ? 'Saving…' : 'Save preset'}
+            </Button>
           </div>
 
-          <button
-            className="w-full rounded bg-slate-200 px-3 py-3 text-sm font-semibold text-slate-950"
-            onClick={() => void submit()}
-          >
-            Create preset
-          </button>
+          <div className="text-xs text-textMuted">
+            Thumbnail & metadata may appear after first deploy.
+          </div>
         </div>
       )}
-    </AppShell>
+    </>
   );
 }

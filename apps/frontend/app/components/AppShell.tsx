@@ -4,7 +4,14 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
 
-import { Clock, FolderOpen, LayoutGrid, Printer, Settings } from 'lucide-react';
+import {
+  Bell,
+  Clock,
+  FolderOpen,
+  LayoutGrid,
+  Printer,
+  Settings,
+} from 'lucide-react';
 
 import { useAuth } from '../auth/auth_context';
 
@@ -95,14 +102,24 @@ export function AppShell({
           </div>
         </div>
 
-        <div className="text-right text-[11px] text-textSecondary">
-          <div className="flex items-center justify-end gap-2">
-            <div className={`h-2 w-2 rounded-full ${wsDot}`} />
-            <div>{wsText || '—'}</div>
-          </div>
-          <div className="text-textMuted">v={v || '-'}</div>
-          <div className="text-textMuted">
-            {token ? 'auth ok' : 'auth none'}
+        <div className="flex items-center gap-2">
+          <Link
+            href="/settings#notifications"
+            className="flex h-11 w-11 items-center justify-center rounded-btn border border-border/70 bg-surface2 text-textSecondary transition active:scale-[0.98]"
+            aria-label="Notification settings"
+          >
+            <Bell size={18} />
+          </Link>
+
+          <div className="text-right text-[11px] text-textSecondary">
+            <div className="flex items-center justify-end gap-2">
+              <div className={`h-2 w-2 rounded-full ${wsDot}`} />
+              <div>{wsText || '—'}</div>
+            </div>
+            <div className="text-textMuted">v={v || '-'}</div>
+            <div className="text-textMuted">
+              {token ? 'auth ok' : 'auth none'}
+            </div>
           </div>
         </div>
       </div>
