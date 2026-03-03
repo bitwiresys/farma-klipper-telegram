@@ -14,7 +14,10 @@ export default function RootLayout({
 }: Readonly<{ children: ReactNode }>) {
   return (
     <html lang="en">
-      <body className="min-h-screen bg-slate-950 text-slate-50">
+      <body
+        className="min-h-screen bg-slate-950 text-slate-50"
+        data-app-version={process.env.NEXT_PUBLIC_APP_VERSION ?? ''}
+      >
         <AuthProvider>{children}</AuthProvider>
       </body>
     </html>
