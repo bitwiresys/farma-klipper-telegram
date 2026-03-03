@@ -132,6 +132,15 @@ export default function PrintersPage() {
     await apiRequest(`/api/printers/${id}/cancel`, { token, method: 'POST' });
   };
 
+  const emergencyStopPrinter = async (id: string) => {
+    if (!token) return;
+    setErr(null);
+    await apiRequest(`/api/printers/${id}/emergency_stop`, {
+      token,
+      method: 'POST',
+    });
+  };
+
   return (
     <AppShell>
       <div className="flex items-center justify-between">
@@ -267,6 +276,23 @@ export default function PrintersPage() {
                     onClick={() => void removePrinter(p.id)}
                   >
                     Remove
+                  </button>
+                </div>
+
+                <div className="mt-2">
+                  <button
+                    className="w-full rounded bg-red-950 px-2 py-2 text-xs"
+                    onClick={() => {
+                      if (
+                        !confirm(
+                          'EMERGENCY STOP? This will immediately stop the printer.',
+                        )
+                      )
+                        return;
+                      void emergencyStopPrinter(p.id);
+                    }}
+                  >
+                    Emergency stop
                   </button>
                 </div>
 

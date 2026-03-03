@@ -43,6 +43,9 @@ function isProtectedApiRoute(method: string, pathname: string): boolean {
   if (m === 'POST' && /^\/api\/printers\/[^/]+\/(test|rescan)$/.test(pathname))
     return true;
 
+  if (m === 'POST' && /^\/api\/printers\/[^/]+\/emergency_stop$/.test(pathname))
+    return true;
+
   if (m === 'PATCH' && /^\/api\/printer-models\/[^/]+$/.test(pathname))
     return true;
   if (m === 'DELETE' && /^\/api\/printer-models\/[^/]+$/.test(pathname))

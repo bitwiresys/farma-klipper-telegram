@@ -163,4 +163,10 @@ export async function registerPrintersRoutes(app: FastifyInstance) {
     const res = await printerRuntime.action(id, 'cancel');
     return reply.send({ ok: true, res });
   });
+
+  app.post('/api/printers/:id/emergency_stop', async (req, reply) => {
+    const id = (req.params as any).id as string;
+    const res = await printerRuntime.emergencyStop(id);
+    return reply.send({ ok: true, res });
+  });
 }

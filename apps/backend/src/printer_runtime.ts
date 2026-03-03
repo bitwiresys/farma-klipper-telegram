@@ -800,6 +800,12 @@ export class PrinterRuntimeManager {
     if (action === 'resume') return http.post('/printer/print/resume');
     return http.post('/printer/print/cancel');
   }
+
+  async emergencyStop(printerId: string) {
+    const { baseUrl, apiKey } = await this.getPrinterSecrets(printerId);
+    const http = new MoonrakerHttp({ baseUrl, apiKey });
+    return http.post('/printer/emergency_stop');
+  }
 }
 
 export const printerRuntime = new PrinterRuntimeManager();
