@@ -19,18 +19,21 @@ export async function apiRequest<T>(path: string, opts: { token?: string; method
 
   const url = `${base}${path}`;
 
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  };
+  const headers: Record<string, string> = {};
 
   if (opts.token) {
     headers.Authorization = `Bearer ${opts.token}`;
   }
 
+  const hasBody = opts.body !== undefined;
+  if (hasBody) {
+    headers['Content-Type'] = 'application/json';
+  }
+
   const res = await fetch(url, {
     method: opts.method ?? 'GET',
     headers,
-    body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
+    body: hasBody ? JSON.stringify(opts.body) : undefined,
     cache: 'no-store',
   });
 

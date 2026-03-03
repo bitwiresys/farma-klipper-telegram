@@ -8,7 +8,7 @@ import { apiRequest } from '../lib/api';
 import { getBackendBaseUrl, getBackendWsUrl } from '../lib/env';
 
 export default function SettingsPage() {
-  const { token, setToken } = useAuth();
+  const { token } = useAuth();
   const [health, setHealth] = useState<string>('(not pinged)');
 
   const base = useMemo(() => getBackendBaseUrl(), []);
@@ -42,9 +42,6 @@ export default function SettingsPage() {
           <div className="mt-3 flex gap-2">
             <button className="flex-1 rounded bg-slate-950 px-3 py-2 text-xs" onClick={() => void ping()}>
               Ping /api/health
-            </button>
-            <button className="flex-1 rounded bg-slate-950 px-3 py-2 text-xs" onClick={() => setToken(null)}>
-              Logout
             </button>
           </div>
 

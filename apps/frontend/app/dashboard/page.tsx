@@ -41,7 +41,7 @@ export default function DashboardPage() {
     initDataLen: 0,
   });
   const [printers, setPrinters] = useState<PrinterDto[]>([]);
-  const [loginState, setLoginState] = useState<LoginState>({ state: 'ready_to_login' });
+  const [loginState, setLoginState] = useState<LoginState>({ state: 'logging_in' });
 
   useEffect(() => {
     if (token) {
@@ -54,7 +54,17 @@ export default function DashboardPage() {
       const hasTelegram = isTelegramWebApp();
       const initDataLen = getTelegramInitData().length;
       setTgDebug({ hasTelegram, initDataLen });
-      setLoginState({ state: hasTelegram ? 'ready_to_login' : 'need_telegram' });
+      if (!hasTelegram) {
+        setLoginState({ state: 'need_telegram' });
+        return;
+      }
+
+      if (initDataLen > 0) {
+        await login();
+        return;
+      }
+
+      setLoginState({ state: 'need_telegram' });
     })();
   }, [token]);
 
@@ -74,7 +84,7 @@ export default function DashboardPage() {
       setLoginState({ state: 'authed' });
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
-      setLoginState({ state: isTelegramWebApp() ? 'ready_to_login' : 'need_telegram' });
+      setLoginState({ state: 'need_telegram' });
     }
   };
 

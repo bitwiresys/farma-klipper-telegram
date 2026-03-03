@@ -24,7 +24,16 @@ export function connectBackendWs(opts: {
     opts.onStatus('connecting');
 
     const u = new URL(base);
-    u.pathname = '/api/ws';
+
+    if (u.protocol === 'http:') u.protocol = 'ws:';
+    if (u.protocol === 'https:') u.protocol = 'wss:';
+
+    if (u.pathname.endsWith('/api/ws')) {
+      u.pathname = u.pathname.slice(0, -'/api/ws'.length) || '/';
+    }
+
+    const prefix = u.pathname.replace(/\/$/, '');
+    u.pathname = `${prefix}/api/ws`;
     u.search = new URLSearchParams({ token: opts.token }).toString();
 
     ws = new WebSocket(u.toString());
