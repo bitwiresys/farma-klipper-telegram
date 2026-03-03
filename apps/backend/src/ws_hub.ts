@@ -130,5 +130,4 @@ export async function registerWsHub(app: FastifyInstance) {
   };
 
   app.get('/api/ws', { websocket: true }, handler);
-  app.get('/api/ws/', { websocket: true }, handler);
 }

@@ -17,7 +17,7 @@ import { registerHistoryRoutes } from './routes_history.js';
 import { registerWsHub } from './ws_hub.js';
 
 export async function buildApp() {
-  const app = Fastify({ logger: loggerOptions });
+  const app = Fastify({ logger: loggerOptions, ignoreTrailingSlash: true });
 
   registerErrorHandling(app);
   registerReadOnlyGuard(app);
