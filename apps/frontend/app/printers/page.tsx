@@ -12,6 +12,8 @@ export default function PrintersPage() {
   const { token } = useAuth();
   const [err, setErr] = useState<string | null>(null);
 
+  const devOnly = process.env.NEXT_PUBLIC_DEV_ONLY === '1';
+
   const [printers, setPrinters] = useState<PrinterDto[]>([]);
   const [models, setModels] = useState<Array<{ id: string; name: string }>>([]);
 
@@ -179,7 +181,7 @@ export default function PrintersPage() {
                   <div>{p.needsRekey ? 'needsRekey=true' : 'ok'}</div>
                 </div>
 
-                <div className="mt-3 grid grid-cols-3 gap-2">
+                <div className="mt-2 grid grid-cols-3 gap-2">
                   <button className="rounded bg-slate-950 px-2 py-2 text-xs" onClick={() => void testPrinter(p.id)}>
                     Test
                   </button>
@@ -191,17 +193,19 @@ export default function PrintersPage() {
                   </button>
                 </div>
 
-                <div className="mt-2 grid grid-cols-3 gap-2">
-                  <button className="rounded bg-slate-950 px-2 py-2 text-xs" onClick={() => void pausePrinter(p.id)}>
-                    Pause
-                  </button>
-                  <button className="rounded bg-slate-950 px-2 py-2 text-xs" onClick={() => void resumePrinter(p.id)}>
-                    Resume
-                  </button>
-                  <button className="rounded bg-red-950/40 px-2 py-2 text-xs" onClick={() => void cancelPrinter(p.id)}>
-                    Cancel
-                  </button>
-                </div>
+                {devOnly && (
+                  <div className="mt-2 grid grid-cols-3 gap-2">
+                    <button className="rounded bg-slate-950 px-2 py-2 text-xs" onClick={() => void pausePrinter(p.id)}>
+                      Pause
+                    </button>
+                    <button className="rounded bg-slate-950 px-2 py-2 text-xs" onClick={() => void resumePrinter(p.id)}>
+                      Resume
+                    </button>
+                    <button className="rounded bg-red-950/40 px-2 py-2 text-xs" onClick={() => void cancelPrinter(p.id)}>
+                      Cancel
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
             {printers.length === 0 && <div className="text-xs text-slate-400">No printers.</div>}
