@@ -13,6 +13,7 @@ import { registerMeRoutes } from './routes_me.js';
 import { registerPrinterModelsRoutes } from './routes_printer_models.js';
 import { registerPrintersRoutes } from './routes_printers.js';
 import { registerSnapshotRoutes } from './routes_snapshot.js';
+import { registerHistoryRoutes } from './routes_history.js';
 import { registerWsHub } from './ws_hub.js';
 
 export async function buildApp() {
@@ -44,6 +45,7 @@ export async function buildApp() {
   await registerPrinterModelsRoutes(app);
   await registerPrintersRoutes(app);
   await registerSnapshotRoutes(app);
+  await registerHistoryRoutes(app);
   await registerWsHub(app);
 
   return app;
