@@ -6,6 +6,10 @@ import { encryptApiKey } from '../crypto_api_key.js';
 import { MoonrakerHttp } from '../moonraker_http.js';
 
 async function main() {
+  if (env.NODE_ENV !== 'development' || process.env.ENABLE_DEV_BOOTSTRAP !== '1') {
+    throw new Error('bootstrap:printer is disabled. Set ENABLE_DEV_BOOTSTRAP=1 and run in NODE_ENV=development');
+  }
+
   const baseUrl = process.env.MOONRAKER_BASE_URL_BOOTSTRAP ?? 'http://192.168.0.45:7125';
   const apiKey = process.env.MOONRAKER_API_KEY_BOOTSTRAP;
   if (!apiKey) {
