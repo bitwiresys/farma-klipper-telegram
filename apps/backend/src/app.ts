@@ -7,6 +7,7 @@ import { env } from './env.js';
 import { loggerOptions } from './logger.js';
 import { registerAuthMiddleware } from './auth.js';
 import { registerErrorHandling } from './errors.js';
+import { registerReadOnlyGuard } from './read_only.js';
 import { registerAuthRoutes } from './routes_auth.js';
 import { registerMeRoutes } from './routes_me.js';
 import { registerPrinterModelsRoutes } from './routes_printer_models.js';
@@ -18,6 +19,7 @@ export async function buildApp() {
   const app = Fastify({ logger: loggerOptions });
 
   registerErrorHandling(app);
+  registerReadOnlyGuard(app);
 
   await app.register(cors, {
     origin: env.CORS_ORIGIN,

@@ -5,6 +5,15 @@ const schema = z.object({
   PORT: z.coerce.number().int().positive().default(3001),
   BASE_URL_PUBLIC: z.string().url().default('http://localhost:3001'),
 
+  BACKEND_READ_ONLY: z
+    .string()
+    .optional()
+    .transform((v) => {
+      if (v === undefined) return process.env.NODE_ENV === 'production';
+      const s = v.trim().toLowerCase();
+      return !(s === '0' || s === 'false' || s === 'no');
+    }),
+
   JWT_SECRET: z.string().min(16),
 
   TELEGRAM_BOT_TOKEN: z.string().min(10),
@@ -23,7 +32,9 @@ const schema = z.object({
   CORS_ORIGIN: z.string().default('*'),
 });
 
-export const env = schema.parse(process.env);
+export type Env = z.infer<typeof schema>;
+
+export const env: Env = schema.parse(process.env);
 
 export function getAllowedTelegramUserIds(): Set<number> {
   const raw = env.TELEGRAM_ALLOWED_USER_IDS.trim();

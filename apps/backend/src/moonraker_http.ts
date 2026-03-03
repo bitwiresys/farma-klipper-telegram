@@ -1,4 +1,5 @@
 import { logger } from './logger.js';
+import { env } from './env.js';
 
 export type MoonrakerHttpOptions = {
   baseUrl: string;
@@ -60,6 +61,9 @@ export class MoonrakerHttp {
   }
 
   async post<T>(path: string, body?: unknown, init?: MoonrakerRequestInit): Promise<T> {
+    if (env.BACKEND_READ_ONLY) {
+      throw new Error('READ_ONLY: moonraker post blocked');
+    }
     const url = `${this.baseUrl}${path}`;
     logger.debug({ url }, 'moonraker http post');
     return fetchJson<T>(
