@@ -8,12 +8,6 @@ function isBlockedWrite(url: string): boolean {
 
   if (/^\/api\/printers\/[^/]+\/(pause|resume|cancel)$/.test(u)) return true;
   if (/^\/api\/presets\/[^/]+\/print$/.test(u)) return true;
-
-  const lowered = u.toLowerCase();
-  if (lowered.includes('upload')) return true;
-  if (lowered.includes('start')) return true;
-  if (lowered.includes('gcode_script')) return true;
-
   return false;
 }
 

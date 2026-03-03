@@ -62,7 +62,29 @@ export class MoonrakerHttp {
 
   async post<T>(path: string, body?: unknown, init?: MoonrakerRequestInit): Promise<T> {
     if (env.BACKEND_READ_ONLY) {
-      throw new Error('READ_ONLY: moonraker post blocked');
+      const p = path.split('?')[0] ?? path;
+
+      // Allow explicit read-only POST(s)
+      if (p === '/printer/objects/query') {
+        // ok
+      } else {
+        // Block explicit write POSTs
+        const writePrefixes = [
+          '/printer/print/',
+          '/printer/gcode/',
+          '/server/files/',
+          '/printer/emergency_stop',
+          '/machine/',
+          '/server/restart',
+        ];
+
+        if (writePrefixes.some((x) => p.startsWith(x)) || writePrefixes.includes(p)) {
+          throw new Error(`READ_ONLY: moonraker post blocked (${p})`);
+        }
+
+        // Default deny any unknown POSTs in read-only mode
+        throw new Error(`READ_ONLY: moonraker post blocked (${p})`);
+      }
     }
     const url = `${this.baseUrl}${path}`;
     logger.debug({ url }, 'moonraker http post');
