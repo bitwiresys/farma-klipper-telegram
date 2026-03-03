@@ -7,6 +7,7 @@ import type { PrintHistoryDto, PrinterDto } from '../lib/dto';
 import { AppShell } from '../components/AppShell';
 import { useAuth } from '../auth/auth_context';
 import { apiRequest } from '../lib/api';
+import { connectBackendWs } from '../lib/ws';
 
 type StatusFilter = 'all' | 'completed' | 'error' | 'cancelled';
 
@@ -49,6 +50,32 @@ export default function HistoryPage() {
   useEffect(() => {
     void load();
   }, [token, status]);
+
+  useEffect(() => {
+    if (!token) return;
+    let closed = false;
+
+    const conn = connectBackendWs({
+      token,
+      onStatus: () => undefined,
+      onEvent: (ev) => {
+        if (closed) return;
+        if (ev.type !== 'HISTORY_EVENT') return;
+        const p = ev.payload as any;
+        const h = p?.history as PrintHistoryDto | undefined;
+        if (!h) return;
+        setHistory((prev) => {
+          const next = [h, ...prev.filter((x) => x.id !== h.id)];
+          return next.slice(0, 50);
+        });
+      },
+    });
+
+    return () => {
+      closed = true;
+      conn.close();
+    };
+  }, [token]);
 
   return (
     <AppShell>

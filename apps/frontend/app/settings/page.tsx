@@ -17,6 +17,7 @@ type NotificationsSettings = {
 export default function SettingsPage() {
   const { token } = useAuth();
   const [health, setHealth] = useState<string>('(not pinged)');
+  const [backendStatus, setBackendStatus] = useState<string>('(not loaded)');
   const [notif, setNotif] = useState<NotificationsSettings | null>(null);
   const [notifErr, setNotifErr] = useState<string | null>(null);
 
@@ -29,6 +30,16 @@ export default function SettingsPage() {
       setHealth(JSON.stringify(res));
     } catch (e) {
       setHealth(e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  const loadBackendStatus = async () => {
+    if (!token) return;
+    try {
+      const res = await apiRequest('/api/status', { token });
+      setBackendStatus(JSON.stringify(res));
+    } catch (e) {
+      setBackendStatus(e instanceof Error ? e.message : String(e));
     }
   };
 
@@ -170,6 +181,20 @@ export default function SettingsPage() {
 
           <div className="mt-3 rounded bg-slate-950 p-3 font-mono text-xs">
             {health}
+          </div>
+
+          <div className="mt-4 text-slate-400">Backend status</div>
+          <div className="mt-2 flex gap-2">
+            <button
+              className="flex-1 rounded bg-slate-950 px-3 py-2 text-xs"
+              onClick={() => void loadBackendStatus()}
+            >
+              Load /api/status
+            </button>
+          </div>
+
+          <div className="mt-3 rounded bg-slate-950 p-3 font-mono text-xs">
+            {backendStatus}
           </div>
         </div>
       </div>

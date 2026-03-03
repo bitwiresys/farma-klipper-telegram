@@ -16,6 +16,7 @@ import { registerSnapshotRoutes } from './routes_snapshot.js';
 import { registerHistoryRoutes } from './routes_history.js';
 import { registerPresetsRoutes } from './routes_presets.js';
 import { registerNotificationSettingsRoutes } from './routes_settings_notifications.js';
+import { registerStatusRoutes } from './routes_status.js';
 import { registerWsHub } from './ws_hub.js';
 
 export async function buildApp() {
@@ -66,6 +67,7 @@ export async function buildApp() {
   await registerHistoryRoutes(app);
   await registerPresetsRoutes(app);
   await registerNotificationSettingsRoutes(app);
+  await registerStatusRoutes(app);
   await registerWsHub(app);
 
   return app;
