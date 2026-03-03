@@ -70,9 +70,6 @@ export default function SettingsPage() {
 
   const wsStatus = ws.status;
 
-  const [layersHelpOpen, setLayersHelpOpen] = useState(false);
-  const [copiedKey, setCopiedKey] = useState<null | 'start' | 'layer'>(null);
-
   const [addUserOpen, setAddUserOpen] = useState(false);
   const [newTelegramId, setNewTelegramId] = useState('');
   const [addingUser, setAddingUser] = useState(false);
@@ -210,33 +207,6 @@ export default function SettingsPage() {
     ws.reconnect();
   };
 
-  const startMacroSnippet =
-    '[gcode_macro START_PRINT]\n' +
-    'gcode:\n' +
-    '  # Your start routine\n' +
-    '  SET_PRINT_STATS_INFO CURRENT_LAYER=0 TOTAL_LAYER=0\n';
-
-  const layerChangeSnippet =
-    '# Call this on each layer change\n' +
-    'SET_PRINT_STATS_INFO CURRENT_LAYER={layer_num} TOTAL_LAYER={total_layers}\n';
-
-  const copy = async (text: string) => {
-    setErr(null);
-    try {
-      await navigator.clipboard.writeText(text);
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
-    }
-  };
-
-  const copyWithFeedback = async (key: 'start' | 'layer', text: string) => {
-    await copy(text);
-    setCopiedKey(key);
-    setTimeout(() => {
-      setCopiedKey((prev) => (prev === key ? null : prev));
-    }, 1000);
-  };
-
   return (
     <div className="space-y-3">
       {!token && (
@@ -317,13 +287,6 @@ export default function SettingsPage() {
                 disabled={!token || notifLoading}
               >
                 {notifLoading ? 'Loading…' : 'Reload'}
-              </Button>
-              <Button
-                variant="secondary"
-                onClick={() => setLayersHelpOpen(true)}
-                disabled={!token}
-              >
-                How to enable layers
               </Button>
             </div>
           </div>
@@ -480,42 +443,6 @@ export default function SettingsPage() {
           </div>
         </div>
       </Card>
-
-      <BottomSheet
-        open={layersHelpOpen}
-        onClose={() => setLayersHelpOpen(false)}
-        title="Enable layers"
-      >
-        <div className="space-y-3">
-          <div className="text-xs text-textSecondary">
-            Enable layer reporting so the app can show “current/total layer”.
-          </div>
-          <div className="rounded-btn border border-border/70 bg-surface2 p-3 text-xs">
-            <div className="text-textMuted">Copy snippet</div>
-            <div className="mt-1 text-textSecondary">
-              Add these lines to your Klipper macros/config.
-            </div>
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              <Button
-                variant="secondary"
-                onClick={() =>
-                  void copyWithFeedback('start', startMacroSnippet)
-                }
-              >
-                {copiedKey === 'start' ? 'Copied' : 'Copy START macro'}
-              </Button>
-              <Button
-                variant="secondary"
-                onClick={() =>
-                  void copyWithFeedback('layer', layerChangeSnippet)
-                }
-              >
-                {copiedKey === 'layer' ? 'Copied' : 'Copy LAYER CHANGE'}
-              </Button>
-            </div>
-          </div>
-        </div>
-      </BottomSheet>
 
       <BottomSheet
         open={addUserOpen}

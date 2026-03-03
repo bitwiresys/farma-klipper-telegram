@@ -3,8 +3,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 
-import '@fastify/multipart';
-
 import { CreatePresetSchema, UpdatePresetSchema } from '@farma/shared';
 
 import { Prisma } from '@prisma/client';
@@ -27,6 +25,28 @@ function isSafeFilename(name: string): boolean {
   if (name.includes('\\')) return false;
   if (name.startsWith('/')) return false;
   return true;
+}
+
+const GCODE_REF_PREFIX = 'mr:';
+
+function encodeGcodeRef(input: {
+  sourcePrinterId: string;
+  filename: string;
+}): string {
+  return `${GCODE_REF_PREFIX}${input.sourcePrinterId}::${input.filename}`;
+}
+
+function decodeGcodeRef(
+  x: string,
+): { sourcePrinterId: string; filename: string } | null {
+  if (!x.startsWith(GCODE_REF_PREFIX)) return null;
+  const rest = x.slice(GCODE_REF_PREFIX.length);
+  const idx = rest.indexOf('::');
+  if (idx <= 0) return null;
+  const sourcePrinterId = rest.slice(0, idx);
+  const filename = rest.slice(idx + 2);
+  if (!sourcePrinterId || !filename) return null;
+  return { sourcePrinterId, filename };
 }
 
 function presetToDto(p: any) {
@@ -138,72 +158,33 @@ export async function registerPresetsRoutes(app: FastifyInstance) {
   });
 
   app.post('/api/presets', async (req, reply) => {
-    if (!req.isMultipart()) {
-      return reply.code(400).send({
-        error: 'BAD_REQUEST',
-        message: 'multipart/form-data required',
-      });
-    }
-
-    const parts = req.parts();
-
-    let fileBuf: Buffer | null = null;
-    let fileName: string | null = null;
-    let jsonRaw: string | null = null;
-
-    for await (const part of parts) {
-      if (part.type === 'file') {
-        if (part.fieldname !== 'gcode' && part.fieldname !== 'file') continue;
-        fileName = part.filename;
-        fileBuf = await part.toBuffer();
-      } else {
-        if (part.fieldname !== 'data') continue;
-        jsonRaw = String(part.value ?? '');
-      }
-    }
-
-    if (!fileBuf)
-      return reply.code(400).send({
-        error: 'BAD_REQUEST',
-        message: 'gcode file is required (field: gcode or file)',
-      });
-    if (!fileName)
-      return reply
-        .code(400)
-        .send({ error: 'BAD_REQUEST', message: 'gcode filename missing' });
-    if (!isSafeFilename(fileName)) {
-      return reply
-        .code(400)
-        .send({ error: 'BAD_REQUEST', message: 'invalid gcode filename' });
-    }
-
-    if (!jsonRaw)
-      return reply.code(400).send({
-        error: 'BAD_REQUEST',
-        message: 'data is required (field: data)',
-      });
-
-    let data: unknown;
-    try {
-      data = JSON.parse(jsonRaw);
-    } catch {
-      return reply
-        .code(400)
-        .send({ error: 'BAD_REQUEST', message: 'data must be valid JSON' });
-    }
-
-    const parsed = CreatePresetSchema.safeParse(data);
+    const body = (req.body ?? {}) as any;
+    const parsed = CreatePresetSchema.safeParse(body);
     if (!parsed.success) {
       return reply
         .code(400)
         .send({ error: 'BAD_REQUEST', details: parsed.error.flatten() });
     }
 
+    const sourcePrinterId = String(body?.sourcePrinterId ?? '').trim();
+    const sourceFilename = String(body?.sourceFilename ?? '').trim();
+    if (!sourcePrinterId || !sourceFilename) {
+      return reply.code(400).send({
+        error: 'BAD_REQUEST',
+        message: 'sourcePrinterId and sourceFilename required',
+      });
+    }
+    if (!isSafeFilename(sourceFilename)) {
+      return reply
+        .code(400)
+        .send({ error: 'BAD_REQUEST', message: 'invalid sourceFilename' });
+    }
+
     const presetId = crypto.randomUUID();
-    const gcodeRel = path.posix.join('presets', presetId, fileName);
-    const gcodeAbs = resolveFilesDirSafe(gcodeRel);
-    ensureDir(path.dirname(gcodeAbs));
-    fs.writeFileSync(gcodeAbs, fileBuf);
+    const gcodeRef = encodeGcodeRef({
+      sourcePrinterId,
+      filename: sourceFilename,
+    });
 
     const created = await prisma.preset.create({
       data: {
@@ -212,7 +193,7 @@ export async function registerPresetsRoutes(app: FastifyInstance) {
         plasticType: parsed.data.plasticType,
         colorHex: parsed.data.colorHex,
         description: parsed.data.description ?? null,
-        gcodePath: gcodeRel,
+        gcodePath: gcodeRef,
         gcodeMeta: Prisma.DbNull,
         allowedModels: {
           create: parsed.data.compatibilityRules.allowedModelIds.map(
@@ -321,8 +302,39 @@ export async function registerPresetsRoutes(app: FastifyInstance) {
       return reply.code(409).send({ error: 'BLOCKED', reasons });
     }
 
-    const abs = resolveFilesDirSafe(preset.gcodePath);
-    const gcodeBuf = fs.readFileSync(abs);
+    const ref = decodeGcodeRef(preset.gcodePath);
+
+    const gcodeBuf = ref
+      ? await (async () => {
+          const sourcePrinter = await prisma.printer.findUnique({
+            where: { id: ref.sourcePrinterId },
+          });
+          if (!sourcePrinter) {
+            throw new Error('SOURCE_PRINTER_NOT_FOUND');
+          }
+
+          const sourceApiKey = decryptApiKey(
+            sourcePrinter.apiKeyEncrypted,
+            env.PRINTER_API_KEY_ENC_KEY,
+          );
+
+          const sourceHttp = new MoonrakerHttp({
+            baseUrl: sourcePrinter.baseUrl,
+            apiKey: sourceApiKey,
+          });
+
+          // Download gcode from Moonraker file manager
+          return sourceHttp.downloadFile({
+            root: 'gcodes',
+            filename: ref.filename,
+          });
+        })()
+      : (() => {
+          // legacy upload-based preset
+          const abs = resolveFilesDirSafe(preset.gcodePath);
+          return fs.readFileSync(abs);
+        })();
+
     const checksum = sha256Hex(gcodeBuf);
     const remoteDir = path.posix.join('tg_presets', presetId);
     const remoteFilename = path.posix.join(remoteDir, `${checksum}.gcode`);
@@ -435,12 +447,15 @@ export async function registerPresetsRoutes(app: FastifyInstance) {
 
     await prisma.preset.delete({ where: { id } });
 
-    // best-effort: remove files
+    // best-effort: remove local files only for legacy upload-based presets
     try {
-      const abs = resolveFilesDirSafe(preset.gcodePath);
-      if (fs.existsSync(abs)) fs.rmSync(abs, { force: true });
-      const dir = path.dirname(abs);
-      if (fs.existsSync(dir)) fs.rmSync(dir, { recursive: true, force: true });
+      if (!preset.gcodePath.startsWith(GCODE_REF_PREFIX)) {
+        const abs = resolveFilesDirSafe(preset.gcodePath);
+        if (fs.existsSync(abs)) fs.rmSync(abs, { force: true });
+        const dir = path.dirname(abs);
+        if (fs.existsSync(dir))
+          fs.rmSync(dir, { recursive: true, force: true });
+      }
     } catch {
       // ignore
     }

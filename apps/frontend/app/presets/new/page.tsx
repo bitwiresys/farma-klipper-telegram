@@ -8,12 +8,7 @@ import { CreatePresetSchema } from '../../lib/schemas';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { useAuth } from '../../auth/auth_context';
-import {
-  apiRequest,
-  apiRequestForm,
-  tryParseApiErrorBody,
-  type ApiError,
-} from '../../lib/api';
+import { apiRequest, tryParseApiErrorBody, type ApiError } from '../../lib/api';
 import type { PresetDto } from '../../lib/dto';
 
 type FieldErrors = Record<string, string[]>;
@@ -30,13 +25,16 @@ export default function NewPresetPage() {
   const [err, setErr] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
 
-  const [filePickerId] = useState(
-    () => `file_${Math.random().toString(16).slice(2)}`,
-  );
-
   const [models, setModels] = useState<Array<{ id: string; name: string }>>([]);
+  const [printers, setPrinters] = useState<
+    Array<{ id: string; displayName: string }>
+  >([]);
+  const [history, setHistory] = useState<
+    Array<{ printerId: string; filename: string }>
+  >([]);
 
-  const [file, setFile] = useState<File | null>(null);
+  const [sourcePrinterId, setSourcePrinterId] = useState<string>('');
+  const [sourceFilename, setSourceFilename] = useState<string>('');
   const [title, setTitle] = useState('');
   const [plasticType, setPlasticType] = useState('PLA');
   const [colorHex, setColorHex] = useState('#ffffff');
@@ -58,8 +56,41 @@ export default function NewPresetPage() {
     setModels(res.models);
   };
 
+  const loadHistory = async () => {
+    if (!token) return;
+    const res = await apiRequest<{
+      history: Array<{ printerId: string; filename: string }>;
+    }>('/api/history?limit=200', { token });
+    const items = Array.isArray(res.history) ? res.history : [];
+    setHistory(
+      items
+        .map((x) => ({
+          printerId: String(x.printerId),
+          filename: String(x.filename),
+        }))
+        .filter((x) =>
+          Boolean(x.printerId && x.filename && x.filename !== 'unknown'),
+        ),
+    );
+  };
+
+  const loadPrinters = async () => {
+    if (!token) return;
+    const res = await apiRequest<{
+      printers: Array<{ id: string; displayName: string }>;
+    }>('/api/printers', { token });
+    setPrinters(
+      (res.printers ?? []).map((p) => ({
+        id: String(p.id),
+        displayName: String(p.displayName),
+      })),
+    );
+  };
+
   useEffect(() => {
     void loadModels();
+    void loadHistory();
+    void loadPrinters();
   }, [token]);
 
   const toggleModel = (id: string) => {
@@ -94,8 +125,8 @@ export default function NewPresetPage() {
     setErr(null);
     setFieldErrors({});
 
-    if (!file) {
-      setErr('Select .gcode file');
+    if (!sourcePrinterId || !sourceFilename) {
+      setErr('Select gcode from history');
       return;
     }
 
@@ -104,6 +135,8 @@ export default function NewPresetPage() {
       plasticType,
       colorHex,
       description: description ? description : null,
+      sourcePrinterId,
+      sourceFilename,
       compatibilityRules: {
         allowedModelIds,
         allowedNozzleDiameters: sortedNozzles,
@@ -119,15 +152,12 @@ export default function NewPresetPage() {
       return;
     }
 
-    const form = new FormData();
-    form.append('gcode', file, file.name);
-    form.append('data', JSON.stringify(parsed.data));
-
     try {
       setSaving(true);
-      const res = await apiRequestForm<{ preset: PresetDto }>('/api/presets', {
+      const res = await apiRequest<{ preset: PresetDto }>('/api/presets', {
         token,
-        form,
+        method: 'POST',
+        body: parsed.data,
       });
       window.location.href = `/presets/${res.preset.id}`;
     } catch (e) {
@@ -163,25 +193,46 @@ export default function NewPresetPage() {
 
           <Card className="p-3">
             <div className="text-xs font-medium text-textPrimary">
-              Upload gcode
+              Choose gcode from history
             </div>
-            <div className="mt-2 rounded-card border border-border/70 bg-surface2 p-3">
-              <div className="text-xs text-textSecondary">
-                {file ? file.name : 'No file selected'}
-              </div>
-              <div className="mt-3">
-                <label htmlFor={filePickerId} className="block">
-                  <Button className="w-full" variant="primary">
-                    Choose file (.gcode)
-                  </Button>
-                </label>
-                <input
-                  id={filePickerId}
-                  className="hidden"
-                  type="file"
-                  accept=".gcode"
-                  onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-                />
+            <div className="mt-2 grid gap-2">
+              <select
+                className="w-full rounded-btn border border-border/70 bg-surface2 p-3 text-xs"
+                value={sourcePrinterId}
+                onChange={(e) => {
+                  setSourcePrinterId(e.target.value);
+                  setSourceFilename('');
+                }}
+              >
+                <option value="">Printer…</option>
+                {printers.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.displayName}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                className="w-full rounded-btn border border-border/70 bg-surface2 p-3 text-xs"
+                value={sourceFilename}
+                onChange={(e) => setSourceFilename(e.target.value)}
+                disabled={!sourcePrinterId}
+              >
+                <option value="">Gcode file…</option>
+                {history
+                  .filter((h) => h.printerId === sourcePrinterId)
+                  .map((h) => h.filename)
+                  .filter((x, i, a) => a.indexOf(x) === i)
+                  .slice(0, 200)
+                  .map((fn) => (
+                    <option key={fn} value={fn}>
+                      {fn}
+                    </option>
+                  ))}
+              </select>
+
+              <div className="text-xs text-textMuted">
+                Files are taken from Moonraker history.
               </div>
             </div>
           </Card>

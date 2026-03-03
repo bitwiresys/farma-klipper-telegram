@@ -71,29 +71,6 @@ export default function PrintersPage() {
     void load();
   }, [token]);
 
-  const testPrinter = async (id: string) => {
-    if (!token) return;
-    setErr(null);
-    setBusy(true);
-    try {
-      await apiRequest(`/api/printers/${id}/test`, { token, method: 'POST' });
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const rescanPrinter = async (id: string) => {
-    if (!token) return;
-    setErr(null);
-    setBusy(true);
-    try {
-      await apiRequest(`/api/printers/${id}/rescan`, { token, method: 'POST' });
-      await load();
-    } finally {
-      setBusy(false);
-    }
-  };
-
   const removePrinter = async (id: string) => {
     if (!token) return;
     setErr(null);
@@ -184,45 +161,24 @@ export default function PrintersPage() {
             />
           )}
 
-          <BottomSheet
-            open={actionsOpen}
-            onClose={() => setActionsOpen(false)}
-            title={active ? active.displayName : 'Printer'}
-          >
-            <div className="space-y-2">
-              <Button
-                variant="primary"
-                onClick={() => {
-                  if (!activePrinterId) return;
-                  void testPrinter(activePrinterId);
-                }}
-                disabled={!activePrinterId || busy}
+          {actionsOpen && active && (
+            <div className="mt-3">
+              <BottomSheet
+                open={actionsOpen}
+                onClose={() => setActionsOpen(false)}
+                title={active.displayName}
               >
-                {busy ? 'Testing…' : 'Test connection'}
-              </Button>
-
-              <Button
-                variant="secondary"
-                onClick={() => {
-                  if (!activePrinterId) return;
-                  void rescanPrinter(activePrinterId);
-                }}
-                disabled={!activePrinterId || busy}
-              >
-                Rescan specs
-              </Button>
-
-              <Button
-                variant="destructive"
-                onClick={() => {
-                  setConfirmRemoveOpen(true);
-                }}
-                disabled={!activePrinterId || busy}
-              >
-                Remove
-              </Button>
+                <div className="space-y-3">
+                  <div className="rounded-btn border border-border/70 bg-surface2 p-3 text-xs">
+                    <div className="text-textSecondary">Model</div>
+                    <div className="mt-1 text-textPrimary">
+                      {active.modelName}
+                    </div>
+                  </div>
+                </div>
+              </BottomSheet>
             </div>
-          </BottomSheet>
+          )}
 
           <BottomSheet
             open={confirmRemoveOpen}

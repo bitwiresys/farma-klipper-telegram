@@ -51,8 +51,6 @@ export default function PrinterDetailsPage() {
 
   const [models, setModels] = useState<Array<{ id: string; name: string }>>([]);
 
-  const [testing, setTesting] = useState(false);
-  const [testedOk, setTestedOk] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const [confirmRemoveOpen, setConfirmRemoveOpen] = useState(false);
@@ -85,7 +83,6 @@ export default function PrinterDetailsPage() {
     setModelId(printer.modelId ?? '');
     setMoonrakerBaseUrl('');
     setMoonrakerApiKey('');
-    setTestedOk(false);
   }, [printer?.id]);
 
   useEffect(() => {
@@ -100,58 +97,9 @@ export default function PrinterDetailsPage() {
     });
   }, [token, printerId, ws]);
 
-  const testConnection = async () => {
-    if (!token) return;
-    setErr(null);
-    setTesting(true);
-    setTestedOk(false);
-    try {
-      await apiRequest(`/api/printers/${printerId}/test`, {
-        token,
-        method: 'POST',
-      });
-      setTestedOk(true);
-    } catch (e) {
-      const ae = e as ApiError;
-      const parsed = tryParseApiErrorBody(ae.bodyText);
-      setErr(
-        typeof parsed === 'object' && parsed
-          ? JSON.stringify(parsed)
-          : ae.bodyText,
-      );
-    } finally {
-      setTesting(false);
-    }
-  };
-
-  const rescanSpecs = async () => {
-    if (!token) return;
-    setErr(null);
-    setTesting(true);
-    try {
-      await apiRequest(`/api/printers/${printerId}/rescan`, {
-        token,
-        method: 'POST',
-      });
-      await load();
-      setTestedOk(true);
-    } catch (e) {
-      const ae = e as ApiError;
-      const parsed = tryParseApiErrorBody(ae.bodyText);
-      setErr(
-        typeof parsed === 'object' && parsed
-          ? JSON.stringify(parsed)
-          : ae.bodyText,
-      );
-    } finally {
-      setTesting(false);
-    }
-  };
-
   const save = async () => {
     if (!token) return;
     if (!printer) return;
-    if (!testedOk) return;
 
     setErr(null);
     setSaving(true);
@@ -203,8 +151,7 @@ export default function PrinterDetailsPage() {
     }
   };
 
-  const saveDisabled =
-    !displayName.trim() || !modelId.trim() || !testedOk || saving;
+  const saveDisabled = !displayName.trim() || !modelId.trim() || saving;
 
   return (
     <>
@@ -261,7 +208,6 @@ export default function PrinterDetailsPage() {
                 value={displayName}
                 onChange={(e) => {
                   setDisplayName(e.target.value);
-                  setTestedOk(false);
                 }}
               />
 
@@ -270,7 +216,6 @@ export default function PrinterDetailsPage() {
                 value={modelId}
                 onChange={(e) => {
                   setModelId(e.target.value);
-                  setTestedOk(false);
                 }}
               >
                 <option value="">Model…</option>
@@ -287,7 +232,6 @@ export default function PrinterDetailsPage() {
                 value={moonrakerBaseUrl}
                 onChange={(e) => {
                   setMoonrakerBaseUrl(e.target.value);
-                  setTestedOk(false);
                 }}
               />
 
@@ -299,7 +243,6 @@ export default function PrinterDetailsPage() {
                   value={moonrakerApiKey}
                   onChange={(e) => {
                     setMoonrakerApiKey(e.target.value);
-                    setTestedOk(false);
                   }}
                 />
                 <Button
@@ -308,33 +251,6 @@ export default function PrinterDetailsPage() {
                 >
                   {showKey ? 'Hide' : 'Show'}
                 </Button>
-              </div>
-            </div>
-          </Card>
-
-          <Card className="p-3">
-            <div className="text-xs font-medium text-textPrimary">
-              Connection
-            </div>
-            <div className="mt-2 space-y-2">
-              <Button
-                variant="primary"
-                onClick={() => void testConnection()}
-                disabled={testing}
-              >
-                {testing ? 'Testing…' : 'Test connection'}
-              </Button>
-
-              <Button
-                variant="secondary"
-                onClick={() => void rescanSpecs()}
-                disabled={testing}
-              >
-                Rescan specs
-              </Button>
-
-              <div className="text-xs text-textMuted">
-                Refresh bed size & nozzle from printer
               </div>
             </div>
           </Card>
@@ -357,6 +273,9 @@ export default function PrinterDetailsPage() {
                   {fmtNum(printer.nozzleDiameter, 2)}
                 </div>
               </div>
+            </div>
+            <div className="mt-2 text-xs text-textMuted">
+              Specs are detected automatically from Moonraker.
             </div>
           </Card>
 

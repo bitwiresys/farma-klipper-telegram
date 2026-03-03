@@ -13,8 +13,6 @@ import {
   Settings,
 } from 'lucide-react';
 
-import { useAuth } from '../auth/auth_context';
-
 type TabKey = 'dashboard' | 'presets' | 'printers' | 'history' | 'settings';
 
 function titleFromPath(pathname: string): { title: string; tab?: TabKey } {
@@ -68,7 +66,6 @@ export function AppShell({
   children: ReactNode;
   wsStatus?: 'idle' | 'connecting' | 'open' | 'closed' | 'error';
 }) {
-  const { token } = useAuth();
   const v = process.env.NEXT_PUBLIC_APP_VERSION ?? '';
   const pathname = usePathname();
   const { title, tab } = titleFromPath(pathname);
@@ -94,7 +91,7 @@ export function AppShell({
           : 'bg-offlineGray';
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-xl flex-col px-4 pb-4 pt-4">
+    <div className="mx-auto flex min-h-screen max-w-xl flex-col px-4 pb-24 pt-4">
       <div className="flex items-center justify-between">
         <div>
           <div className="text-[18px] font-semibold text-textPrimary">
@@ -117,46 +114,47 @@ export function AppShell({
               <div>{wsText || '—'}</div>
             </div>
             <div className="text-textMuted">v={v || '-'}</div>
-            <div className="text-textMuted">
-              {token ? 'auth ok' : 'auth none'}
-            </div>
           </div>
         </div>
       </div>
 
       <div className="mt-4 flex-1">{children}</div>
 
-      <div className="mt-4 grid grid-cols-5 gap-2 rounded-card border border-border/70 bg-surface1 p-2">
-        <NavItem
-          href="/dashboard"
-          label="Dashboard"
-          icon={<LayoutGrid size={20} />}
-          active={tab === 'dashboard'}
-        />
-        <NavItem
-          href="/presets"
-          label="Presets"
-          icon={<FolderOpen size={20} />}
-          active={tab === 'presets'}
-        />
-        <NavItem
-          href="/printers"
-          label="Printers"
-          icon={<Printer size={20} />}
-          active={tab === 'printers'}
-        />
-        <NavItem
-          href="/history"
-          label="History"
-          icon={<Clock size={20} />}
-          active={tab === 'history'}
-        />
-        <NavItem
-          href="/settings"
-          label="Settings"
-          icon={<Settings size={20} />}
-          active={tab === 'settings'}
-        />
+      <div className="fixed bottom-4 left-0 right-0 z-20">
+        <div className="mx-auto max-w-xl px-4">
+          <div className="grid grid-cols-5 gap-2 rounded-card border border-border/70 bg-surface1 p-2">
+            <NavItem
+              href="/dashboard"
+              label="Dashboard"
+              icon={<LayoutGrid size={20} />}
+              active={tab === 'dashboard'}
+            />
+            <NavItem
+              href="/presets"
+              label="Presets"
+              icon={<FolderOpen size={20} />}
+              active={tab === 'presets'}
+            />
+            <NavItem
+              href="/printers"
+              label="Printers"
+              icon={<Printer size={20} />}
+              active={tab === 'printers'}
+            />
+            <NavItem
+              href="/history"
+              label="History"
+              icon={<Clock size={20} />}
+              active={tab === 'history'}
+            />
+            <NavItem
+              href="/settings"
+              label="Settings"
+              icon={<Settings size={20} />}
+              active={tab === 'settings'}
+            />
+          </div>
+        </div>
       </div>
     </div>
   );

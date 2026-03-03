@@ -10,19 +10,6 @@ import { apiRequest, tryParseApiErrorBody, type ApiError } from '../../lib/api';
 
 type ModelDto = { id: string; name: string };
 
-type DraftSpecs = {
-  bedX: number | null;
-  bedY: number | null;
-  bedZ: number | null;
-  nozzleDiameter: number | null;
-};
-
-function fmtNum(x: number | null | undefined, digits = 0): string {
-  if (x === null || x === undefined) return '—';
-  const p = Math.pow(10, digits);
-  return String(Math.round(x * p) / p);
-}
-
 export default function NewPrinterPage() {
   const { token } = useAuth();
 
@@ -36,10 +23,6 @@ export default function NewPrinterPage() {
   const [moonrakerApiKey, setMoonrakerApiKey] = useState('');
   const [showKey, setShowKey] = useState(false);
 
-  const [testing, setTesting] = useState(false);
-  const [testedOk, setTestedOk] = useState(false);
-  const [specs, setSpecs] = useState<DraftSpecs | null>(null);
-
   const loadModels = async () => {
     if (!token) return;
     const m = await apiRequest<{ models: ModelDto[] }>('/api/printer-models', {
@@ -52,19 +35,14 @@ export default function NewPrinterPage() {
     void loadModels();
   }, [token]);
 
-  const canTest = useMemo(() => {
-    return Boolean(moonrakerBaseUrl.trim() && moonrakerApiKey.trim());
-  }, [moonrakerBaseUrl, moonrakerApiKey]);
-
   const canSave = useMemo(() => {
     return Boolean(
       displayName.trim() &&
       modelId.trim() &&
       moonrakerBaseUrl.trim() &&
-      moonrakerApiKey.trim() &&
-      testedOk,
+      moonrakerApiKey.trim(),
     );
-  }, [displayName, modelId, moonrakerBaseUrl, moonrakerApiKey, testedOk]);
+  }, [displayName, modelId, moonrakerBaseUrl, moonrakerApiKey]);
 
   const createModel = async () => {
     if (!token) return;
@@ -78,37 +56,6 @@ export default function NewPrinterPage() {
     });
     setNewModelName('');
     await loadModels();
-  };
-
-  const testConnection = async () => {
-    if (!token) return;
-    setErr(null);
-    setTesting(true);
-    setTestedOk(false);
-    setSpecs(null);
-
-    try {
-      const res = await apiRequest<{ ok: true; info: any; specs: DraftSpecs }>(
-        '/api/printers/test-draft',
-        {
-          token,
-          method: 'POST',
-          body: { moonrakerBaseUrl, moonrakerApiKey },
-        },
-      );
-      setSpecs(res.specs);
-      setTestedOk(true);
-    } catch (e) {
-      const ae = e as ApiError;
-      const parsed = tryParseApiErrorBody(ae.bodyText);
-      setErr(
-        typeof parsed === 'object' && parsed
-          ? JSON.stringify(parsed)
-          : ae.bodyText,
-      );
-    } finally {
-      setTesting(false);
-    }
   };
 
   const save = async () => {
@@ -214,8 +161,6 @@ export default function NewPrinterPage() {
                 value={moonrakerBaseUrl}
                 onChange={(e) => {
                   setMoonrakerBaseUrl(e.target.value);
-                  setTestedOk(false);
-                  setSpecs(null);
                 }}
               />
 
@@ -227,8 +172,6 @@ export default function NewPrinterPage() {
                   value={moonrakerApiKey}
                   onChange={(e) => {
                     setMoonrakerApiKey(e.target.value);
-                    setTestedOk(false);
-                    setSpecs(null);
                   }}
                 />
                 <Button
@@ -242,39 +185,6 @@ export default function NewPrinterPage() {
               <div className="text-xs text-textMuted">
                 API key will not be displayed after save.
               </div>
-
-              <Button
-                variant="primary"
-                onClick={() => void testConnection()}
-                disabled={!canTest || testing}
-              >
-                {testing ? 'Testing…' : 'Test connection'}
-              </Button>
-
-              {testedOk && specs && (
-                <div className="mt-2 rounded-card border border-border/70 bg-surface2 p-3">
-                  <div className="text-xs font-medium text-textPrimary">
-                    Detected specs
-                  </div>
-                  <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
-                    <div className="rounded-btn border border-border/70 bg-surface p-2">
-                      <div className="text-textMuted">Bed size</div>
-                      <div className="text-textPrimary">
-                        {fmtNum(specs.bedX, 0)}×{fmtNum(specs.bedY, 0)}×
-                        {fmtNum(specs.bedZ, 0)}
-                      </div>
-                    </div>
-                    <div className="rounded-btn border border-border/70 bg-surface p-2">
-                      <div className="text-textMuted">Nozzle</div>
-                      <div className="text-textPrimary">
-                        {specs.nozzleDiameter === null
-                          ? 'Not found — enter manually after save'
-                          : fmtNum(specs.nozzleDiameter, 2)}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
           </Card>
 

@@ -15,6 +15,12 @@ import { SnapshotCache } from './snapshot_cache.js';
 
 type RawStatus = Record<string, unknown>;
 
+type GcodeMeta = {
+  estimatedTimeSec: number | null;
+  layerHeight: number | null;
+  objectHeight: number | null;
+};
+
 function deepMerge(target: unknown, patch: unknown): unknown {
   if (patch === null || patch === undefined) return target;
   if (Array.isArray(patch)) return patch;
@@ -60,6 +66,35 @@ function arrNumAtOrNull(x: unknown, idx: number): number | null {
   if (!Array.isArray(x)) return null;
   const v = x[idx];
   return numOrNull(v);
+}
+
+function parseMeshMaxToBedXY(meshMax: unknown): {
+  bedX: number | null;
+  bedY: number | null;
+} {
+  if (Array.isArray(meshMax) && meshMax.length >= 2) {
+    const x = numOrNull(meshMax[0]);
+    const y = numOrNull(meshMax[1]);
+    return {
+      bedX: x !== null && Number.isFinite(x) ? x : null,
+      bedY: y !== null && Number.isFinite(y) ? y : null,
+    };
+  }
+  if (typeof meshMax === 'string') {
+    const parts = meshMax
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (parts.length >= 2) {
+      const x = Number(parts[0]);
+      const y = Number(parts[1]);
+      return {
+        bedX: Number.isFinite(x) ? x : null,
+        bedY: Number.isFinite(y) ? y : null,
+      };
+    }
+  }
+  return { bedX: null, bedY: null };
 }
 
 function normalizePrinterState(raw: string | null): PrinterState {
@@ -209,6 +244,13 @@ export class PrinterRuntimeManager {
   private cache = new SnapshotCache();
   private rawStatus = new Map<string, RawStatus>();
   private connectors = new Map<string, MoonrakerWsConnector>();
+
+  private metaByPrinter = new Map<
+    string,
+    { filename: string; meta: GcodeMeta }
+  >();
+  private metaFetchInFlight = new Set<string>();
+  private specsFetchInFlight = new Set<string>();
 
   private sessionCache = new Map<
     string,
@@ -491,40 +533,105 @@ export class PrinterRuntimeManager {
 
           const now = Date.now();
 
-          // ETA smoothing rule
           const progress = snapshot.progress;
-          let etaSec: number | null = null;
+          const activeFilename = snapshot.filename;
 
-          if (progress !== null && printDurationSec !== null) {
-            const minDur = progress >= 0.2 ? 60 : 120;
-            if (
-              progress >= 0.02 &&
-              printDurationSec >= minDur &&
-              progress > 0
-            ) {
-              const estTotal = Math.round(printDurationSec / progress);
-              const rawEta = Math.max(
-                0,
-                estTotal - Math.round(printDurationSec),
-              );
-
-              const minInterval = 12_000;
-              if (now - internal.lastEtaUpdateAtMs >= minInterval) {
-                const prev = internal.etaSecSmoothed;
-                const alpha = 0.25;
-                etaSec =
-                  prev === null
-                    ? rawEta
-                    : Math.round(prev * (1 - alpha) + rawEta * alpha);
-                internal.etaSecSmoothed = etaSec;
-                internal.lastEtaUpdateAtMs = now;
-              } else {
-                etaSec = internal.etaSecSmoothed;
-              }
+          if (
+            activeFilename &&
+            (snapshot.state === PrinterState.printing ||
+              snapshot.state === PrinterState.paused)
+          ) {
+            const cachedMeta = this.metaByPrinter.get(printerId);
+            if (cachedMeta?.filename !== activeFilename) {
+              this.metaByPrinter.delete(printerId);
+            }
+            if (!this.metaFetchInFlight.has(printerId)) {
+              this.metaFetchInFlight.add(printerId);
+              void (async () => {
+                try {
+                  const http = new MoonrakerHttp({ baseUrl, apiKey });
+                  const metaRaw = await http.get<any>(
+                    `/server/files/metadata?filename=${encodeURIComponent(
+                      activeFilename,
+                    )}`,
+                  );
+                  const metaObj = (metaRaw as any)?.result ?? metaRaw;
+                  const est = numOrNull((metaObj as any)?.estimated_time);
+                  const layerHeight = numOrNull((metaObj as any)?.layer_height);
+                  const objectHeight = numOrNull(
+                    (metaObj as any)?.object_height,
+                  );
+                  this.metaByPrinter.set(printerId, {
+                    filename: activeFilename,
+                    meta: {
+                      estimatedTimeSec: est,
+                      layerHeight,
+                      objectHeight,
+                    },
+                  });
+                } catch (e) {
+                  const msg = e instanceof Error ? e.message : String(e);
+                  logger.warn(
+                    { printerId, err: msg },
+                    'failed to fetch gcode metadata',
+                  );
+                } finally {
+                  this.metaFetchInFlight.delete(printerId);
+                }
+              })();
             }
           }
 
-          internal.snapshot = { ...snapshot, etaSec };
+          // ETA prefers slicer metadata estimated_time
+          let etaSec: number | null = null;
+          const meta = this.metaByPrinter.get(printerId);
+          const totalFromMeta =
+            meta?.filename === activeFilename
+              ? meta.meta.estimatedTimeSec
+              : null;
+
+          if (progress !== null && progress > 0 && totalFromMeta !== null) {
+            const rawEta = Math.max(
+              0,
+              Math.round(totalFromMeta * (1 - progress)),
+            );
+            const minInterval = 12_000;
+            if (now - internal.lastEtaUpdateAtMs >= minInterval) {
+              const prev = internal.etaSecSmoothed;
+              const alpha = 0.25;
+              etaSec =
+                prev === null
+                  ? rawEta
+                  : Math.round(prev * (1 - alpha) + rawEta * alpha);
+              internal.etaSecSmoothed = etaSec;
+              internal.lastEtaUpdateAtMs = now;
+            } else {
+              etaSec = internal.etaSecSmoothed;
+            }
+          }
+
+          // Layers: derive from meta + current Z when print_stats info missing
+          let nextLayers = snapshot.layers;
+          if (
+            nextLayers &&
+            nextLayers.total === null &&
+            nextLayers.current === null &&
+            meta?.filename === activeFilename
+          ) {
+            const mh = meta.meta.layerHeight;
+            const oh = meta.meta.objectHeight;
+            const z = snapshot.position?.commanded?.z ?? null;
+            if (mh !== null && oh !== null && mh > 0) {
+              const total = Math.max(1, Math.ceil(oh / mh));
+              const current =
+                z === null
+                  ? null
+                  : Math.max(0, Math.min(total, Math.floor(z / mh)));
+              nextLayers = { current, total };
+            }
+          }
+
+          internal.snapshot = { ...snapshot, etaSec, layers: nextLayers };
           internal.updatedAtMs = now;
 
           this.markDirty(printerId);
@@ -668,6 +775,43 @@ export class PrinterRuntimeManager {
 
     this.connectors.set(printerId, connector);
     connector.start();
+
+    if (!this.specsFetchInFlight.has(printerId)) {
+      this.specsFetchInFlight.add(printerId);
+      void (async () => {
+        try {
+          const http = new MoonrakerHttp({ baseUrl, apiKey });
+          const configResp = (await http.queryObjects(['configfile'])) as any;
+          const cfg =
+            configResp?.result?.status?.configfile?.settings ??
+            configResp?.status?.configfile?.settings ??
+            null;
+
+          const nozzle =
+            Number((cfg as any)?.extruder?.nozzle_diameter ?? NaN) || null;
+          const meshMax = (cfg as any)?.bed_mesh?.mesh_max;
+          const { bedX, bedY } = parseMeshMaxToBedXY(meshMax);
+
+          const data: any = {};
+          if (nozzle !== null && Number.isFinite(nozzle))
+            data.nozzleDiameter = nozzle;
+          if (bedX !== null && Number.isFinite(bedX)) data.bedX = bedX;
+          if (bedY !== null && Number.isFinite(bedY)) data.bedY = bedY;
+          // bedZ is not reliably provided here; keep existing
+          if (Object.keys(data).length > 0) {
+            await prisma.printer.update({ where: { id: printerId }, data });
+          }
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          logger.warn(
+            { printerId, err: msg },
+            'failed to auto-detect printer specs',
+          );
+        } finally {
+          this.specsFetchInFlight.delete(printerId);
+        }
+      })();
+    }
   }
 
   async removeConnector(printerId: string) {
@@ -745,54 +889,6 @@ export class PrinterRuntimeManager {
   async deletePrinter(printerId: string) {
     await this.removeConnector(printerId);
     await prisma.printer.delete({ where: { id: printerId } });
-  }
-
-  async testPrinter(printerId: string) {
-    const { baseUrl, apiKey } = await this.getPrinterSecrets(printerId);
-    const http = new MoonrakerHttp({ baseUrl, apiKey });
-    return http.get('/server/info');
-  }
-
-  async rescanPrinter(printerId: string) {
-    const { baseUrl, apiKey } = await this.getPrinterSecrets(printerId);
-    const http = new MoonrakerHttp({ baseUrl, apiKey });
-
-    const toolheadResp = (await http.queryObjects(['toolhead'])) as any;
-    const configResp = (await http.queryObjects(['configfile'])) as any;
-
-    const toolhead =
-      toolheadResp?.result?.status?.toolhead ?? toolheadResp?.status?.toolhead;
-    const axisMin = toolhead?.axis_minimum;
-    const axisMax = toolhead?.axis_maximum;
-
-    const bedX =
-      Array.isArray(axisMin) && Array.isArray(axisMax)
-        ? Number(axisMax[0]) - Number(axisMin[0])
-        : null;
-    const bedY =
-      Array.isArray(axisMin) && Array.isArray(axisMax)
-        ? Number(axisMax[1]) - Number(axisMin[1])
-        : null;
-    const bedZ =
-      Array.isArray(axisMin) && Array.isArray(axisMax)
-        ? Number(axisMax[2]) - Number(axisMin[2])
-        : null;
-
-    const nozzle =
-      Number(
-        configResp?.result?.status?.configfile?.settings?.extruder
-          ?.nozzle_diameter ??
-          configResp?.status?.configfile?.settings?.extruder?.nozzle_diameter,
-      ) || null;
-
-    const data: any = {};
-    if (bedX !== null && Number.isFinite(bedX)) data.bedX = bedX;
-    if (bedY !== null && Number.isFinite(bedY)) data.bedY = bedY;
-    if (bedZ !== null && Number.isFinite(bedZ)) data.bedZ = bedZ;
-    if (nozzle !== null && Number.isFinite(nozzle))
-      data.nozzleDiameter = nozzle;
-
-    return prisma.printer.update({ where: { id: printerId }, data });
   }
 
   async action(printerId: string, action: 'pause' | 'resume' | 'cancel') {
