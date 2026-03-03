@@ -179,7 +179,7 @@ export class MoonrakerWsConnector {
     );
 
     // Subscribe
-    await this.sendRpc('printer.objects.subscribe', {
+    const subscribeRes = await this.sendRpc('printer.objects.subscribe', {
       objects: {
         print_stats: null,
         virtual_sdcard: null,
@@ -193,6 +193,15 @@ export class MoonrakerWsConnector {
         fan: null,
       },
     });
+
+    try {
+      const initialStatus = (subscribeRes as any)?.status;
+      if (initialStatus && typeof initialStatus === 'object') {
+        this.opts.callbacks.onStatusUpdate(initialStatus);
+      }
+    } catch {
+      // ignore
+    }
 
     logger.info(
       { printerId: this.opts.printerId },
