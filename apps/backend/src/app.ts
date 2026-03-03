@@ -22,8 +22,19 @@ export async function buildApp() {
   registerErrorHandling(app);
   registerReadOnlyGuard(app);
 
+  const corsOrigin = (() => {
+    const raw = (env.CORS_ORIGIN ?? '').trim();
+    if (!raw) return '*';
+    if (raw === '*') return '*';
+    const parts = raw
+      .split(',')
+      .map((x) => x.trim())
+      .filter(Boolean);
+    return parts.length <= 1 ? (parts[0] ?? '*') : parts;
+  })();
+
   await app.register(cors, {
-    origin: env.CORS_ORIGIN,
+    origin: corsOrigin,
     credentials: false,
   });
 
