@@ -153,8 +153,8 @@ export class MoonrakerWsConnector {
     const identifyRes = await this.sendRpc('server.connection.identify', {
       client_name: 'farma-backend',
       version: '0.1',
-      type: 'backend',
-      url: this.opts.baseUrl,
+      type: 'agent',
+      url: 'https://github.com/bitwiresys/farma-klipper-telegram',
     });
 
     const cid = (identifyRes as { connection_id?: unknown } | null)?.connection_id;
