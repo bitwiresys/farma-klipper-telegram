@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 
-import type { PrintHistoryDto, PrinterDto } from '@farma/shared';
+import type { PrintHistoryDto, PrinterDto } from '../lib/dto';
 
 import { AppShell } from '../components/AppShell';
 import { useAuth } from '../auth/auth_context';
