@@ -154,6 +154,7 @@ export class MoonrakerWsConnector {
       client_name: 'farma-backend',
       version: '0.1',
       type: 'backend',
+      url: this.opts.baseUrl,
     });
 
     const cid = (identifyRes as { connection_id?: unknown } | null)?.connection_id;
