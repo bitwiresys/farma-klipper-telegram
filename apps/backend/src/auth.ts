@@ -16,6 +16,27 @@ function unauthorized(reply: FastifyReply, message = 'UNAUTHORIZED') {
   return reply.code(401).send({ error: 'UNAUTHORIZED', message });
 }
 
+function isProtectedApiRoute(method: string, pathname: string): boolean {
+  const m = method.toUpperCase();
+
+  if (m === 'GET' && pathname === '/api/me') return true;
+  if (m === 'GET' && pathname === '/api/snapshot') return true;
+  if (m === 'GET' && pathname === '/api/printers') return true;
+  if (m === 'POST' && pathname === '/api/printers') return true;
+  if (m === 'GET' && pathname === '/api/printer-models') return true;
+  if (m === 'POST' && pathname === '/api/printer-models') return true;
+  if (m === 'GET' && pathname === '/api/history') return true;
+
+  if (m === 'PATCH' && /^\/api\/printers\/[^/]+$/.test(pathname)) return true;
+  if (m === 'DELETE' && /^\/api\/printers\/[^/]+$/.test(pathname)) return true;
+  if (m === 'POST' && /^\/api\/printers\/[^/]+\/(test|rescan)$/.test(pathname)) return true;
+
+  if (m === 'PATCH' && /^\/api\/printer-models\/[^/]+$/.test(pathname)) return true;
+  if (m === 'DELETE' && /^\/api\/printer-models\/[^/]+$/.test(pathname)) return true;
+
+  return false;
+}
+
 export function registerAuthMiddleware(app: FastifyInstance) {
   app.addHook('preHandler', async (req, reply) => {
     const pathname = req.url.split('?')[0] ?? '';
@@ -25,6 +46,8 @@ export function registerAuthMiddleware(app: FastifyInstance) {
     if (pathname === '/api/health') return;
     if (pathname === '/api/auth/telegram') return;
     if (pathname.startsWith('/api/ws')) return;
+
+    if (!isProtectedApiRoute(req.method, pathname)) return;
 
     const authHeader = req.headers.authorization;
     if (!authHeader) return unauthorized(reply, 'Missing Authorization header');
