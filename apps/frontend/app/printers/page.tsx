@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
+import { OctagonX } from 'lucide-react';
 
 import type { PrinterDto } from '../lib/dto';
 
@@ -12,8 +13,9 @@ import { InsetStat } from '../components/ui/InsetStat';
 import { ProgressBar } from '../components/ui/ProgressBar';
 import { StatusPill } from '../components/ui/StatusPill';
 import { useAuth } from '../auth/auth_context';
-import { apiRequest } from '../lib/api';
+import { apiRequest, type ApiError } from '../lib/api';
 import { buildPrinterLabelById } from '../lib/printer_label';
+import { useWs } from '../ws/ws_context';
 
 function fmtNum(x: number | null | undefined, digits = 1): string {
   if (x === null || x === undefined) return '-';
@@ -43,24 +45,50 @@ function fmtMm3S(x: number | null | undefined): string {
 
 export default function PrintersPage() {
   const { token } = useAuth();
+  const ws = useWs();
   const [err, setErr] = useState<string | null>(null);
 
   const [printers, setPrinters] = useState<PrinterDto[]>([]);
 
   const labelById = useMemo(() => buildPrinterLabelById(printers), [printers]);
 
-  const load = async () => {
+  useEffect(() => {
+    if (!token) return;
+    return ws.subscribe((ev) => {
+      const e = ev as any;
+      if (e.type === 'PRINTERS_SNAPSHOT') {
+        const ps = e.payload?.printers as PrinterDto[] | undefined;
+        if (!ps) return;
+        setPrinters(ps);
+        return;
+      }
+      if (e.type === 'PRINTER_STATUS') {
+        const p = e.payload?.printer as PrinterDto | undefined;
+        if (!p) return;
+        setPrinters((prev) => {
+          const idx = prev.findIndex((x) => x.id === p.id);
+          if (idx === -1) return [p, ...prev];
+          const copy = [...prev];
+          copy[idx] = p;
+          return copy;
+        });
+      }
+    });
+  }, [token, ws]);
+
+  const emergencyStop = async (printerId: string) => {
     if (!token) return;
     setErr(null);
-    const p = await apiRequest<{ printers: PrinterDto[] }>('/api/printers', {
-      token,
-    });
-    setPrinters(p.printers);
+    try {
+      await apiRequest(`/api/printers/${printerId}/emergency_stop`, {
+        token,
+        method: 'POST',
+      });
+    } catch (e) {
+      const ae = e as ApiError;
+      setErr(ae.bodyText ?? String(e));
+    }
   };
-
-  useEffect(() => {
-    void load();
-  }, [token]);
 
   return (
     <>
@@ -70,9 +98,6 @@ export default function PrintersPage() {
           <Link href="/printers/new">
             <Button variant="primary">+ Add</Button>
           </Link>
-          <Button variant="secondary" onClick={() => void load()}>
-            Refresh
-          </Button>
         </div>
       </div>
 
@@ -127,7 +152,24 @@ export default function PrintersPage() {
                           </div>
                         )}
                     </div>
-                    <StatusPill state={state} />
+                    <div className="flex items-center gap-2">
+                      {(state === 'printing' || state === 'paused') && (
+                        <button
+                          type="button"
+                          onClick={(ev) => {
+                            ev.preventDefault();
+                            ev.stopPropagation();
+                            void emergencyStop(p.id);
+                          }}
+                          className="flex h-8 w-8 items-center justify-center rounded-btn border border-danger/50 bg-surface2 text-danger transition active:scale-[0.98]"
+                          aria-label="Emergency stop"
+                          title="Emergency stop"
+                        >
+                          <OctagonX size={16} />
+                        </button>
+                      )}
+                      <StatusPill state={state} />
+                    </div>
                   </div>
 
                   <div className="mt-3 flex items-end justify-between gap-3">

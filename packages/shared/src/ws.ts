@@ -1,5 +1,9 @@
 import type { PrinterDto, PrintHistoryDto } from './dto.js';
 
+export type WsPrintersSnapshotPayload = {
+  printers: PrinterDto[];
+};
+
 export type WsPrinterStatusPayload = {
   printer: PrinterDto;
 };
@@ -14,6 +18,10 @@ export type WsPresetUpdatedPayload = {
 };
 
 export type WsEvent =
+  | {
+      type: 'PRINTERS_SNAPSHOT';
+      payload: WsPrintersSnapshotPayload;
+    }
   | {
       type: 'PRINTER_STATUS';
       payload: WsPrinterStatusPayload;

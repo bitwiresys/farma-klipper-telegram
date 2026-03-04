@@ -192,6 +192,10 @@ export const WsPrinterStatusPayloadSchema = z.object({
   printer: PrinterDtoSchema,
 });
 
+export const WsPrintersSnapshotPayloadSchema = z.object({
+  printers: z.array(PrinterDtoSchema),
+});
+
 export const WsHistoryEventPayloadSchema = z.object({
   printerId: z.string(),
   history: PrintHistoryDtoSchema,
@@ -202,6 +206,10 @@ export const WsPresetUpdatedPayloadSchema = z.object({
 });
 
 export const WsEventSchema = z.discriminatedUnion('type', [
+  z.object({
+    type: z.literal('PRINTERS_SNAPSHOT'),
+    payload: WsPrintersSnapshotPayloadSchema,
+  }),
   z.object({
     type: z.literal('PRINTER_STATUS'),
     payload: WsPrinterStatusPayloadSchema,

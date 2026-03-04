@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 
+import { OctagonX } from 'lucide-react';
+
 import type { PrinterDto, PrintHistoryDto } from '../lib/dto';
 
 import { BottomSheet } from '../components/ui/BottomSheet';
@@ -146,24 +148,15 @@ export default function DashboardPage() {
     }
   };
 
-  const load = async () => {
-    if (!token) return;
-    setErr(null);
-    const res = await apiRequest<{ printers: PrinterDto[] }>('/api/snapshot', {
-      token,
-    });
-    setPrinters(res.printers);
-  };
-
-  useEffect(() => {
-    if (!token) return;
-    void load();
-  }, [token]);
-
   useEffect(() => {
     if (!token) return;
     return ws.subscribe((ev) => {
       const e = ev as WsEvent;
+      if (e.type === 'PRINTERS_SNAPSHOT') {
+        const ps = e.payload?.printers as PrinterDto[] | undefined;
+        if (!ps) return;
+        setPrinters(ps);
+      }
       if (e.type === 'PRINTER_STATUS') {
         const p = e.payload?.printer as PrinterDto | undefined;
         if (!p) return;
@@ -186,12 +179,7 @@ export default function DashboardPage() {
     <>
       <div className="flex items-center justify-between">
         <div className="text-xs text-textSecondary">Your printers</div>
-        <div className="flex gap-2">
-          <Button variant="secondary" onClick={() => void load()}>
-            Refresh
-          </Button>
-          <Link href="/printers" className="hidden" />
-        </div>
+        <Link href="/printers" className="hidden" />
       </div>
 
       <div className="mt-3 space-y-3">
@@ -214,7 +202,20 @@ export default function DashboardPage() {
                     {printerLabelById.get(p.id) ?? p.displayName}
                   </div>
                 </Link>
-                <StatusPill state={st} />
+                <div className="flex items-center gap-2">
+                  {(st === 'printing' || st === 'paused') && (
+                    <button
+                      type="button"
+                      onClick={() => void emergencyStop(p.id)}
+                      className="flex h-8 w-8 items-center justify-center rounded-btn border border-danger/50 bg-surface2 text-danger transition active:scale-[0.98]"
+                      aria-label="Emergency stop"
+                      title="Emergency stop"
+                    >
+                      <OctagonX size={16} />
+                    </button>
+                  )}
+                  <StatusPill state={st} />
+                </div>
               </div>
 
               <div className="mt-3">
@@ -271,26 +272,6 @@ export default function DashboardPage() {
                   >
                     Cancel
                   </Button>
-                  <Button
-                    variant="destructive"
-                    onClick={() => void emergencyStop(p.id)}
-                  >
-                    E-Stop
-                  </Button>
-                  {st === 'error' && (
-                    <Button
-                      variant="secondary"
-                      onClick={() =>
-                        setErrorDetails({
-                          open: true,
-                          title: p.displayName,
-                          message: p.snapshot.message ?? '(no message)',
-                        })
-                      }
-                    >
-                      Details
-                    </Button>
-                  )}
                 </div>
               )}
 

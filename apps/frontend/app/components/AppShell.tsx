@@ -9,15 +9,11 @@ import {
   Clock,
   FolderOpen,
   LayoutGrid,
-  OctagonX,
   Printer,
   Settings,
 } from 'lucide-react';
 
-import type { PrinterDto } from '../lib/dto';
-import { apiRequest, type ApiError } from '../lib/api';
 import { useAuth } from '../auth/auth_context';
-import { useWs } from '../ws/ws_context';
 
 type TabKey = 'dashboard' | 'presets' | 'printers' | 'history' | 'settings';
 
@@ -40,19 +36,14 @@ function NavItem({
   label,
   icon,
   active,
-  activePrinter,
 }: {
   href: string;
   label: string;
   icon: ReactNode;
   active: boolean;
-  activePrinter?: any;
 }) {
   const pathname = usePathname();
   void pathname;
-  const filename =
-    ((activePrinter as any)?.snapshot?.jobLabel as string | null | undefined) ??
-    ((activePrinter as any)?.snapshot?.filename as string | null);
   return (
     <Link
       href={href}
@@ -80,73 +71,7 @@ export function AppShell({
   const pathname = usePathname();
   const { title, tab } = titleFromPath(pathname);
   const { token } = useAuth();
-  const ws = useWs();
-
-  const [printers, setPrinters] = useState<PrinterDto[]>([]);
   const [actionErr, setActionErr] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!token) return;
-    let alive = true;
-    void (async () => {
-      try {
-        const res = await apiRequest<{ printers: PrinterDto[] }>(
-          '/api/snapshot',
-          {
-            token,
-          },
-        );
-        if (!alive) return;
-        setPrinters(res.printers ?? []);
-      } catch {
-        // ignore
-      }
-    })();
-    return () => {
-      alive = false;
-    };
-  }, [token]);
-
-  useEffect(() => {
-    if (!token) return;
-    return ws.subscribe((ev) => {
-      const e = ev as any;
-      if (e?.type !== 'PRINTER_STATUS') return;
-      const p = e.payload?.printer as PrinterDto | undefined;
-      if (!p) return;
-      setPrinters((prev) => {
-        const idx = prev.findIndex((x) => x.id === p.id);
-        if (idx === -1) return [p, ...prev];
-        const copy = [...prev];
-        copy[idx] = p;
-        return copy;
-      });
-    });
-  }, [token, ws]);
-
-  const activePrinter = useMemo(() => {
-    return (
-      printers.find(
-        (p) =>
-          p.snapshot?.state === 'printing' || p.snapshot?.state === 'paused',
-      ) ?? null
-    );
-  }, [printers]);
-
-  const doEstop = async () => {
-    if (!token) return;
-    if (!activePrinter) return;
-    setActionErr(null);
-    try {
-      await apiRequest(`/api/printers/${activePrinter.id}/emergency_stop`, {
-        token,
-        method: 'POST',
-      });
-    } catch (e) {
-      const ae = e as ApiError;
-      setActionErr(ae.bodyText ?? String(e));
-    }
-  };
 
   const wsText =
     wsStatus === 'open'
@@ -186,18 +111,6 @@ export function AppShell({
               <div className={`h-2 w-2 rounded-full ${wsDot}`} />
               <div>{wsText || '—'}</div>
             </div>
-
-            {activePrinter && (
-              <button
-                type="button"
-                onClick={() => void doEstop()}
-                className="flex h-11 w-11 items-center justify-center rounded-btn border border-danger/50 bg-surface2 text-danger transition active:scale-[0.98]"
-                aria-label="Emergency stop"
-                title="Emergency stop"
-              >
-                <OctagonX size={18} />
-              </button>
-            )}
 
             <Link
               href="/settings#notifications"

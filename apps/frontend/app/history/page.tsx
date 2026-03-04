@@ -145,9 +145,6 @@ export default function HistoryPage() {
     <>
       <div className="flex items-center justify-between">
         <div className="text-xs text-textSecondary">History</div>
-        <Button variant="secondary" onClick={() => void load({ reset: true })}>
-          Refresh
-        </Button>
       </div>
 
       {!token && (

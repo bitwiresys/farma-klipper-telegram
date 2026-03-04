@@ -99,9 +99,6 @@ export default function PresetsPage() {
           <Link href="/presets/new">
             <Button variant="primary">+ Add</Button>
           </Link>
-          <Button variant="secondary" onClick={() => void load()}>
-            Refresh
-          </Button>
         </div>
       </div>
 

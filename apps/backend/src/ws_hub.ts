@@ -39,6 +39,28 @@ export class WsHub {
       if (!user || !user.isAllowed) throw new Error('User not allowed');
 
       this.clients.add(client);
+
+      const printers = await prisma.printer.findMany({
+        include: { model: true },
+      });
+      const ev: WsEvent = {
+        type: 'PRINTERS_SNAPSHOT',
+        payload: {
+          printers: printers.map((p) => ({
+            id: p.id,
+            displayName: p.displayName,
+            modelId: p.modelId,
+            modelName: p.model.name,
+            bedX: p.bedX,
+            bedY: p.bedY,
+            bedZ: p.bedZ,
+            nozzleDiameter: p.nozzleDiameter,
+            needsRekey: (p as any).needsRekey ?? false,
+            snapshot: printerRuntime.getSnapshot(p.id),
+          })),
+        },
+      };
+      client.send(JSON.stringify(ev));
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       client.close(1008, msg);

@@ -84,11 +84,6 @@ export default function PresetDetailPage() {
       },
     );
     setPreset(p.preset);
-
-    const s = await apiRequest<{ printers: PrinterDto[] }>('/api/snapshot', {
-      token,
-    });
-    setPrinters(s.printers);
   };
 
   useEffect(() => {
@@ -99,6 +94,11 @@ export default function PresetDetailPage() {
     if (!token) return;
     return ws.subscribe((ev) => {
       const e = ev as WsEvent;
+      if (e.type === 'PRINTERS_SNAPSHOT') {
+        const ps = e.payload?.printers as PrinterDto[] | undefined;
+        if (!ps) return;
+        setPrinters(ps);
+      }
       if (e.type === 'PRINTER_STATUS') {
         const p = e.payload?.printer as PrinterDto | undefined;
         if (!p) return;
