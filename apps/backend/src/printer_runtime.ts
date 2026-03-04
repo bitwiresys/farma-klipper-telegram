@@ -102,8 +102,32 @@ function normalizePrinterState(raw: string | null): PrinterState {
   if (s === 'printing') return PrinterState.printing;
   if (s === 'paused') return PrinterState.paused;
   if (s === 'error') return PrinterState.error;
+
+  // Klipper/Moonraker often report terminal or transitional states here.
+  // Treat completion-like states as READY/standby (not offline).
+  if (
+    s === 'complete' ||
+    s === 'completed' ||
+    s === 'cancelled' ||
+    s === 'canceled' ||
+    s === 'canceling' ||
+    s === 'cancelled' ||
+    s === 'standby'
+  ) {
+    return PrinterState.standby;
+  }
+
+  // Klippy shutdown/disconnect should be considered an error state.
+  if (s.includes('shutdown') || s.includes('disconnect')) {
+    return PrinterState.error;
+  }
+
   if (s === 'standby' || s === 'ready' || s === 'idle')
     return PrinterState.standby;
+
+  // If we have some state string but don't recognize it, do not mark offline.
+  // Offline should represent connectivity loss, not an unknown print_stats.state.
+  if (s) return PrinterState.standby;
   return PrinterState.offline;
 }
 
