@@ -191,8 +191,13 @@ function computeSnapshotFromStatus(raw: RawStatus): {
     const c = numOrNull((ps as any)?.info?.current_layer);
     const t = numOrNull((ps as any)?.info?.total_layer);
     if (c !== null && t !== null && t > 1 && c >= 0 && c <= t) {
-      layers.current = c;
-      layers.total = t;
+      const d = printDurationSec;
+      const early = d === null ? true : d < 120;
+      const plausibleEarly = c <= 10;
+      if (!early || plausibleEarly) {
+        layers.current = c;
+        layers.total = t;
+      }
     }
   }
 
@@ -688,7 +693,14 @@ export class PrinterRuntimeManager {
               const current = Math.ceil((z - flh) / lh + 1) || 0;
 
               if (layers > 0 && current > 0 && current <= layers) {
-                nextLayers = { current, total: layers };
+                const early =
+                  printDurationSec === null ? true : printDurationSec < 120;
+                const plausibleEarly = current <= 10;
+                if (!early || plausibleEarly) {
+                  nextLayers = { current, total: layers };
+                } else {
+                  nextLayers = { current: null, total: null };
+                }
               } else {
                 nextLayers = { current: null, total: null };
               }

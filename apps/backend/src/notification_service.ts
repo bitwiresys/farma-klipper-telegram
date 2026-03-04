@@ -57,6 +57,7 @@ type PrinterMemo = {
   gcode: GcodeLine[];
   lastDiagAtMs: number;
   lastInfoAtMs: number;
+  lastPrintSessionId: string | null;
 };
 
 function nowMs(): number {
@@ -143,6 +144,12 @@ export class NotificationService {
       state: snapshot.state,
     });
 
+    if (printSessionId && m.lastPrintSessionId !== printSessionId) {
+      m.lastPrintSessionId = printSessionId;
+      m.lastLayer = null;
+      m.lastPrintState = null;
+    }
+
     const now = nowMs();
     const diagDue = now - m.lastDiagAtMs >= 30_000;
     const infoDue = now - m.lastInfoAtMs >= 120_000;
@@ -222,6 +229,18 @@ export class NotificationService {
     const layersHave = layers.current !== null && layers.total !== null;
     const shouldFirstLayer = (() => {
       if (snapshot.state !== PrinterState.printing) return false;
+
+      // Some firmwares/Moonraker setups report stale or bogus layer counters
+      // immediately after print start. Guard against implausible early values.
+      if (
+        layersHave &&
+        printDurationSec !== null &&
+        printDurationSec < 120 &&
+        (layers.current ?? 0) > 10
+      ) {
+        return false;
+      }
+
       if (layersHave) {
         return (
           layers.current !== null &&
@@ -362,6 +381,7 @@ export class NotificationService {
       gcode: [],
       lastDiagAtMs: 0,
       lastInfoAtMs: 0,
+      lastPrintSessionId: null,
     };
     this.memo.set(printerId, created);
     return created;
