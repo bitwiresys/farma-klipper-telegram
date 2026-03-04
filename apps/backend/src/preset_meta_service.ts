@@ -4,6 +4,7 @@ import path from 'node:path';
 import { env } from './env.js';
 import { prisma } from './prisma.js';
 import { MoonrakerHttp } from './moonraker_http.js';
+import { logger } from './logger.js';
 
 function ensureDir(p: string) {
   fs.mkdirSync(p, { recursive: true });
@@ -104,6 +105,12 @@ export class PresetMetaService {
 
     if (shouldFetchThumb) {
       const best = pickBestThumbnail(thumbs);
+      if (!best) {
+        logger.warn(
+          { presetId: input.presetId, remoteFilename: input.remoteFilename },
+          'moonraker thumbnails missing',
+        );
+      }
       if (
         best &&
         typeof best.thumbnail_path === 'string' &&
@@ -112,16 +119,39 @@ export class PresetMetaService {
         const thumbPath = best.thumbnail_path
           .replace(/^\/+/, '')
           .replace(/^gcodes\/+/, '');
-        const bytes = await input.http.downloadFile({
-          root: 'gcodes',
-          filename: thumbPath,
-        });
+        let bytes: Buffer;
+        try {
+          bytes = await input.http.downloadFile({
+            root: 'gcodes',
+            filename: thumbPath,
+          });
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          logger.warn(
+            {
+              presetId: input.presetId,
+              remoteFilename: input.remoteFilename,
+              thumbPath,
+              err: msg,
+            },
+            'moonraker thumbnail download failed',
+          );
+          bytes = Buffer.from('');
+        }
 
-        const outRel = path.posix.join('presets', input.presetId, 'thumb.png');
-        const outAbs = resolveFilesDirSafe(outRel);
-        ensureDir(path.dirname(outAbs));
-        fs.writeFileSync(outAbs, bytes);
-        thumbRel = outRel;
+        if (bytes.length === 0) {
+          // keep thumbRel null
+        } else {
+          const outRel = path.posix.join(
+            'presets',
+            input.presetId,
+            'thumb.png',
+          );
+          const outAbs = resolveFilesDirSafe(outRel);
+          ensureDir(path.dirname(outAbs));
+          fs.writeFileSync(outAbs, bytes);
+          thumbRel = outRel;
+        }
       }
     }
 
