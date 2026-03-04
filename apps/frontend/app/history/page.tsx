@@ -185,13 +185,12 @@ export default function HistoryPage() {
                 }}
               >
                 <Card className="p-3">
-                  <div className="flex items-resolveTsumbUrl(htart gap-3">
-                    )
+                  <div className="flex items-start gap-3">
                     {h.thumbnailUrl ? (
                       <div className="mt-0.5 h-9 w-9 shrink-0 overflow-hidden rounded-btn border border-border/60 bg-surface2">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
-                          src={withCacheBust(h.thumbnailUrl)}
+                          src={resolveThumbUrl(withCacheBust(h.thumbnailUrl))}
                           alt="thumbnail"
                           className="h-full w-full object-cover"
                         />
@@ -248,12 +247,11 @@ export default function HistoryPage() {
 
             {active && (
               <div className="space-y-3">
-                resolveThumbUrl()
                 {active.thumbnailUrl && (
                   <div className="overflow-hidden rounded-card border border-border/70 bg-surface2">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
-                      src={withCacheBust(active.thumbnailUrl)}
+                      src={resolveThumbUrl(withCacheBust(active.thumbnailUrl))}
                       alt="thumbnail"
                       className="h-40 w-full object-cover"
                     />

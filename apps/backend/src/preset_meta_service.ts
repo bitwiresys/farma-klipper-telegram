@@ -24,6 +24,7 @@ type ThumbnailDetails = {
   height: number;
   size: number;
   thumbnail_path: string;
+  relative_path?: string;
 };
 
 type MetadataResponse = {
@@ -56,6 +57,13 @@ function pickBestThumbnail(
   }
 
   return best;
+}
+
+function normalizeMoonrakerThumbPath(raw: string): string {
+  return String(raw)
+    .trim()
+    .replace(/^\/+/, '')
+    .replace(/^gcodes\/+/, '');
 }
 
 export class PresetMetaService {
@@ -111,14 +119,17 @@ export class PresetMetaService {
           'moonraker thumbnails missing',
         );
       }
-      if (
-        best &&
-        typeof best.thumbnail_path === 'string' &&
-        best.thumbnail_path
-      ) {
-        const thumbPath = best.thumbnail_path
-          .replace(/^\/+/, '')
-          .replace(/^gcodes\/+/, '');
+      const bestPath = best
+        ? typeof (best as any).relative_path === 'string' &&
+          String((best as any).relative_path).trim()
+          ? String((best as any).relative_path)
+          : typeof best.thumbnail_path === 'string' && best.thumbnail_path
+            ? best.thumbnail_path
+            : null
+        : null;
+
+      if (best && bestPath) {
+        const thumbPath = normalizeMoonrakerThumbPath(bestPath);
         let bytes: Buffer;
         try {
           bytes = await input.http.downloadFile({
