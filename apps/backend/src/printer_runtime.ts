@@ -17,6 +17,7 @@ type RawStatus = Record<string, unknown>;
 
 type GcodeMeta = {
   estimatedTimeSec: number | null;
+  firstLayerHeight: number | null;
   layerHeight: number | null;
   objectHeight: number | null;
 };
@@ -606,6 +607,9 @@ export class PrinterRuntimeManager {
                   );
                   const metaObj = (metaRaw as any)?.result ?? metaRaw;
                   const est = numOrNull((metaObj as any)?.estimated_time);
+                  const firstLayerHeight = numOrNull(
+                    (metaObj as any)?.first_layer_height,
+                  );
                   const layerHeight = numOrNull((metaObj as any)?.layer_height);
                   const objectHeight = numOrNull(
                     (metaObj as any)?.object_height,
@@ -614,6 +618,7 @@ export class PrinterRuntimeManager {
                     filename: activeFilename,
                     meta: {
                       estimatedTimeSec: est,
+                      firstLayerHeight,
                       layerHeight,
                       objectHeight,
                     },
@@ -659,29 +664,34 @@ export class PrinterRuntimeManager {
             }
           }
 
-          // Layers: derive from meta + current Z when print_stats info missing
+          // Layers: mimic Fluidd formula (derived from current_file metadata + gcode Z)
           let nextLayers = snapshot.layers;
           if (
-            nextLayers &&
-            nextLayers.total === null &&
-            nextLayers.current === null &&
-            meta?.filename === activeFilename &&
-            snapshot.progress !== null &&
-            snapshot.progress > 0
+            (snapshot.state === PrinterState.printing ||
+              snapshot.state === PrinterState.paused) &&
+            meta?.filename === activeFilename
           ) {
-            const mh = meta.meta.layerHeight;
-            const oh = meta.meta.objectHeight;
-            const z =
-              snapshot.position?.gcode?.z ??
-              snapshot.position?.commanded?.z ??
-              null;
-            if (mh !== null && oh !== null && mh > 0) {
-              const total = Math.max(1, Math.ceil(oh / mh));
-              const current =
-                z === null
-                  ? null
-                  : Math.max(0, Math.min(total, Math.floor(z / mh)));
-              nextLayers = { current, total };
+            const h = meta.meta.objectHeight;
+            const flh = meta.meta.firstLayerHeight;
+            const lh = meta.meta.layerHeight;
+            const z = snapshot.position?.gcode?.z ?? null;
+
+            if (
+              h !== null &&
+              flh !== null &&
+              lh !== null &&
+              lh > 0 &&
+              h > 0 &&
+              z !== null
+            ) {
+              const layers = Math.ceil((h - flh) / lh + 1) || 0;
+              const current = Math.ceil((z - flh) / lh + 1) || 0;
+
+              if (layers > 0 && current > 0 && current <= layers) {
+                nextLayers = { current, total: layers };
+              } else {
+                nextLayers = { current: null, total: null };
+              }
             }
           }
 
