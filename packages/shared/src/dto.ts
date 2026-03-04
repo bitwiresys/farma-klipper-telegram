@@ -42,6 +42,7 @@ export type PrinterSnapshotDto = {
   };
   speed?: {
     liveVelocityMmS?: number | null;
+    liveExtruderVelocityMmS?: number | null;
     gcodeSpeedMmS?: number | null;
     speedFactor?: number | null;
     flowFactor?: number | null;

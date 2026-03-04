@@ -198,6 +198,7 @@ function computeSnapshotFromStatus(raw: RawStatus): {
   };
 
   const liveVelocityMmS = numOrNull(mr.live_velocity);
+  const liveExtruderVelocityMmS = numOrNull((mr as any).live_extruder_velocity);
   const gcodeSpeedMmS = numOrNull(gm.speed);
   const speedFactor = numOrNull(gm.speed_factor);
   const flowFactor = numOrNull(gm.extrude_factor);
@@ -243,6 +244,7 @@ function computeSnapshotFromStatus(raw: RawStatus): {
       },
       speed: {
         liveVelocityMmS,
+        liveExtruderVelocityMmS,
         gcodeSpeedMmS,
         speedFactor,
         flowFactor,

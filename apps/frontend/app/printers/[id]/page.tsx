@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 
 import type { PrinterDto } from '../../lib/dto';
@@ -9,14 +9,8 @@ import type { PrinterDto } from '../../lib/dto';
 import { BottomSheet } from '../../components/ui/BottomSheet';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
-import { InsetStat } from '../../components/ui/InsetStat';
-import { ProgressBar } from '../../components/ui/ProgressBar';
-import { StatusPill } from '../../components/ui/StatusPill';
 import { useAuth } from '../../auth/auth_context';
 import { apiRequest, tryParseApiErrorBody, type ApiError } from '../../lib/api';
-import { useWs } from '../../ws/ws_context';
-
-type WsEvent = { type: string; payload: any };
 
 function fmtNum(x: number | null | undefined, digits = 1): string {
   if (x === null || x === undefined) return '-';
@@ -24,22 +18,8 @@ function fmtNum(x: number | null | undefined, digits = 1): string {
   return String(Math.round(x * p) / p);
 }
 
-function fmtPct01(x: number | null | undefined): string {
-  if (x === null || x === undefined) return '-';
-  return `${Math.round(x * 100)}%`;
-}
-
-function fmtEta(sec: number | null | undefined): string {
-  if (sec === null || sec === undefined) return '-';
-  const s = Math.max(0, Math.floor(sec));
-  const h = Math.floor(s / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  return h > 0 ? `${h}h ${m}m` : `${m}m`;
-}
-
 export default function PrinterDetailsPage() {
   const { token } = useAuth();
-  const ws = useWs();
   const params = useParams() as any;
   const printerId = String(params?.id ?? '');
 
@@ -57,8 +37,6 @@ export default function PrinterDetailsPage() {
   const [saving, setSaving] = useState(false);
 
   const [confirmRemoveOpen, setConfirmRemoveOpen] = useState(false);
-
-  const state = printer?.snapshot?.state ?? 'offline';
 
   const load = async () => {
     if (!token || !printerId) return;
@@ -87,18 +65,6 @@ export default function PrinterDetailsPage() {
     setMoonrakerBaseUrl('');
     setMoonrakerApiKey('');
   }, [printer?.id]);
-
-  useEffect(() => {
-    if (!token || !printerId) return;
-    return ws.subscribe((ev) => {
-      const e = ev as WsEvent;
-      if (e.type !== 'PRINTER_STATUS') return;
-      const p = e.payload?.printer as PrinterDto | undefined;
-      if (!p) return;
-      if (p.id !== printerId) return;
-      setPrinter(p);
-    });
-  }, [token, printerId, ws]);
 
   const save = async () => {
     if (!token) return;
@@ -178,62 +144,6 @@ export default function PrinterDetailsPage() {
 
       {token && printer && (
         <div className="mt-3 space-y-3">
-          <Card className="p-3">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <div className="truncate text-[14px] font-semibold text-textPrimary">
-                  {printer.snapshot.filename ?? printer.displayName}
-                </div>
-                <div className="mt-1 text-xs text-textSecondary">
-                  {printer.displayName}
-                </div>
-              </div>
-              <StatusPill state={state} />
-            </div>
-
-            <div className="mt-3 flex items-end justify-between gap-3">
-              <div className="text-[28px] font-semibold leading-none text-textPrimary">
-                {fmtPct01(printer.snapshot.progress)}
-              </div>
-              <div className="text-right text-xs text-textMuted">
-                ETA {fmtEta(printer.snapshot.etaSec)}
-              </div>
-            </div>
-
-            <div className="mt-3">
-              <ProgressBar value01={printer.snapshot.progress} />
-            </div>
-
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              <InsetStat
-                label="EXTRUDER"
-                value={`${printer.snapshot.temps.extruder ?? '—'}°C`}
-                right={
-                  printer.snapshot.temps.extruderTarget
-                    ? `target ${printer.snapshot.temps.extruderTarget}`
-                    : undefined
-                }
-              />
-              <InsetStat
-                label="BED"
-                value={`${printer.snapshot.temps.bed ?? '—'}°C`}
-                right={
-                  printer.snapshot.temps.bedTarget
-                    ? `target ${printer.snapshot.temps.bedTarget}`
-                    : undefined
-                }
-              />
-            </div>
-
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              <InsetStat
-                label="LAYERS"
-                value={`${printer.snapshot.layers.current ?? '—'} / ${printer.snapshot.layers.total ?? '—'}`}
-              />
-              <InsetStat label="STATE" value={String(state).toUpperCase()} />
-            </div>
-          </Card>
-
           <Card className="p-3">
             <div className="text-xs font-medium text-textPrimary">Fields</div>
             <div className="mt-2 grid gap-2">

@@ -30,6 +30,16 @@ function fmtPct100(x: number | null | undefined): string {
   return `${Math.round(x)}%`;
 }
 
+function fmtMmS(x: number | null | undefined): string {
+  if (x === null || x === undefined) return '-';
+  return `${fmtNum(x, 1)} mm/s`;
+}
+
+function fmtMm3S(x: number | null | undefined): string {
+  if (x === null || x === undefined) return '-';
+  return `${fmtNum(x, 1)} mm³/s`;
+}
+
 export default function PrintersPage() {
   const { token } = useAuth();
   const [err, setErr] = useState<string | null>(null);
@@ -79,14 +89,19 @@ export default function PrintersPage() {
               | { current: number | null; total: number | null }
               | undefined;
 
-            const speedFactor = (p.snapshot as any)?.speed?.speedFactor as
-              | number
-              | null
-              | undefined;
-            const flowFactor = (p.snapshot as any)?.speed?.flowFactor as
-              | number
-              | null
-              | undefined;
+            const liveVelocityMmS = (p.snapshot as any)?.speed
+              ?.liveVelocityMmS as number | null | undefined;
+            const liveExtruderVelocityMmS = (p.snapshot as any)?.speed
+              ?.liveExtruderVelocityMmS as number | null | undefined;
+
+            // Default filament diameter. If you want this per-printer, we'll add it to printer model/settings.
+            const filamentDiaMm = 1.75;
+            const filamentAreaMm2 = Math.PI * Math.pow(filamentDiaMm / 2, 2);
+            const flowMm3S =
+              liveExtruderVelocityMmS === null ||
+              liveExtruderVelocityMmS === undefined
+                ? null
+                : liveExtruderVelocityMmS * filamentAreaMm2;
             const fan = (p.snapshot as any)?.fans?.part?.speed as
               | number
               | null
@@ -156,22 +171,8 @@ export default function PrintersPage() {
                   </div>
 
                   <div className="mt-3 grid grid-cols-3 gap-2">
-                    <InsetStat
-                      label="SPEED"
-                      value={fmtPct100(
-                        speedFactor === null || speedFactor === undefined
-                          ? null
-                          : speedFactor * 100,
-                      )}
-                    />
-                    <InsetStat
-                      label="FLOW"
-                      value={fmtPct100(
-                        flowFactor === null || flowFactor === undefined
-                          ? null
-                          : flowFactor * 100,
-                      )}
-                    />
+                    <InsetStat label="SPEED" value={fmtMmS(liveVelocityMmS)} />
+                    <InsetStat label="FLOW" value={fmtMm3S(flowMm3S)} />
                     <InsetStat
                       label="FAN"
                       value={fmtPct100(

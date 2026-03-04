@@ -108,6 +108,7 @@ export const PrinterSnapshotSchema = z.object({
   speed: z
     .object({
       liveVelocityMmS: z.number().nullable().optional(),
+      liveExtruderVelocityMmS: z.number().nullable().optional(),
       gcodeSpeedMmS: z.number().nullable().optional(),
       speedFactor: z.number().nullable().optional(),
       flowFactor: z.number().nullable().optional(),
