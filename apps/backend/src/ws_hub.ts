@@ -1,7 +1,16 @@
 import type { FastifyInstance } from 'fastify';
 import jwt from 'jsonwebtoken';
 
-import type { WsEvent } from '@farma/shared';
+import {
+  HistoryStatus,
+  type WsClientMessage,
+  type WsEvent,
+} from '@farma/shared';
+import {
+  WsClientMessageSchema,
+  type PrintHistoryDto,
+  type PresetDto,
+} from '@farma/shared';
 import type WebSocket from 'ws';
 
 import { env } from './env.js';
@@ -12,6 +21,56 @@ type Client = {
   send: (data: string) => void;
   close: (code?: number, reason?: string) => void;
 };
+
+type ClientWithWs = Client & {
+  ws: WebSocket;
+};
+
+function presetToDto(p: any): PresetDto {
+  return {
+    id: p.id,
+    title: p.title,
+    plasticType: p.plasticType,
+    colorHex: p.colorHex,
+    description: p.description ?? null,
+    thumbnailUrl: p.thumbnailPath
+      ? `/api/presets/${p.id}/thumbnail?t=${new Date(p.updatedAt).getTime()}`
+      : null,
+    gcodeMeta:
+      p.gcodeMeta && typeof p.gcodeMeta === 'object'
+        ? (p.gcodeMeta as any)
+        : null,
+    compatibilityRules: {
+      allowedModelIds: (p.allowedModels ?? []).map((x: any) => x.modelId),
+      allowedNozzleDiameters: Array.isArray(
+        p.compatibilityRules?.allowedNozzleDiameters,
+      )
+        ? p.compatibilityRules.allowedNozzleDiameters
+        : [],
+      minBedX: p.compatibilityRules?.minBedX ?? 0,
+      minBedY: p.compatibilityRules?.minBedY ?? 0,
+    },
+  };
+}
+
+function toHistoryDto(row: any): PrintHistoryDto {
+  return {
+    id: row.id,
+    printerId: row.printerId,
+    filename: row.filename,
+    status: String(row.status ?? 'in_progress') as any satisfies HistoryStatus,
+    thumbnailUrl: null,
+    startedAt: new Date(row.startedAt).toISOString(),
+    endedAt: row.endedAt ? new Date(row.endedAt).toISOString() : null,
+    printDurationSec:
+      typeof row.printDurationSec === 'number' ? row.printDurationSec : null,
+    totalDurationSec:
+      typeof row.totalDurationSec === 'number' ? row.totalDurationSec : null,
+    filamentUsedMm:
+      typeof row.filamentUsedMm === 'number' ? row.filamentUsedMm : null,
+    errorMessage: row.errorMessage ?? null,
+  };
+}
 
 export class WsHub {
   private clients = new Set<Client>();
@@ -61,9 +120,115 @@ export class WsHub {
         },
       };
       client.send(JSON.stringify(ev));
+
+      const models = await prisma.printerModel.findMany({
+        orderBy: { name: 'asc' },
+      });
+      client.send(
+        JSON.stringify({
+          type: 'PRINTER_MODELS_SNAPSHOT',
+          payload: { requestId: 'init', models },
+        }),
+      );
+
+      const presets = await prisma.preset.findMany({
+        orderBy: { createdAt: 'desc' },
+        include: { allowedModels: true, compatibilityRules: true },
+      });
+      client.send(
+        JSON.stringify({
+          type: 'PRESETS_SNAPSHOT',
+          payload: { requestId: 'init', presets: presets.map(presetToDto) },
+        }),
+      );
+
+      const take = 50;
+      const rows = await prisma.printHistory.findMany({
+        orderBy: { startedAt: 'desc' },
+        take,
+        skip: 0,
+      });
+      const total = await prisma.printHistory.count();
+      client.send(
+        JSON.stringify({
+          type: 'HISTORY_SNAPSHOT',
+          payload: {
+            requestId: 'init',
+            query: { status: 'all', limit: take, offset: 0 },
+            history: rows.map(toHistoryDto),
+            total,
+          },
+        }),
+      );
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       client.close(1008, msg);
+    }
+  }
+
+  async handleClientMessage(client: Client, msg: WsClientMessage) {
+    if (msg.type === 'REQ_PRINTER_MODELS') {
+      const models = await prisma.printerModel.findMany({
+        orderBy: { name: 'asc' },
+      });
+      client.send(
+        JSON.stringify({
+          type: 'PRINTER_MODELS_SNAPSHOT',
+          payload: { requestId: msg.payload.requestId, models },
+        }),
+      );
+      return;
+    }
+
+    if (msg.type === 'REQ_PRESETS') {
+      const presets = await prisma.preset.findMany({
+        orderBy: { createdAt: 'desc' },
+        include: { allowedModels: true, compatibilityRules: true },
+      });
+      client.send(
+        JSON.stringify({
+          type: 'PRESETS_SNAPSHOT',
+          payload: {
+            requestId: msg.payload.requestId,
+            presets: presets.map(presetToDto),
+          },
+        }),
+      );
+      return;
+    }
+
+    if (msg.type === 'REQ_HISTORY') {
+      const status = msg.payload.status;
+      const take = Math.min(200, Math.max(1, Math.floor(msg.payload.limit)));
+      const skip = Math.max(0, Math.floor(msg.payload.offset));
+      const where =
+        status === 'all'
+          ? {}
+          : {
+              status,
+            };
+      const [rows, total] = await Promise.all([
+        prisma.printHistory.findMany({
+          where,
+          orderBy: { startedAt: 'desc' },
+          take,
+          skip,
+        }),
+        prisma.printHistory.count({ where }),
+      ]);
+
+      client.send(
+        JSON.stringify({
+          type: 'HISTORY_SNAPSHOT',
+          payload: {
+            requestId: msg.payload.requestId,
+            query: { status, limit: take, offset: skip },
+            history: rows.map(toHistoryDto),
+            total,
+          },
+        }),
+      );
+      return;
     }
   }
 
@@ -144,12 +309,24 @@ export async function registerWsHub(app: FastifyInstance) {
       : '';
     const token = new URLSearchParams(qs).get('token') ?? '';
 
-    const client: Client = {
+    const client: ClientWithWs = {
       send: (data) => socket.send(data),
       close: (code, reason) => socket.close(code, reason),
+      ws: socket,
     };
 
     await wsHub.addClient(client, token);
+
+    socket.on('message', (data) => {
+      try {
+        const parsed = JSON.parse(String(data));
+        const v = WsClientMessageSchema.safeParse(parsed);
+        if (!v.success) return;
+        void wsHub.handleClientMessage(client, v.data as any);
+      } catch {
+        return;
+      }
+    });
 
     socket.on('close', () => {
       wsHub.removeClient(client);

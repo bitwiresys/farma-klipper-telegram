@@ -21,6 +21,8 @@ type WsState = {
   status: 'idle' | 'connecting' | 'open' | 'closed' | 'error';
   subscribe: (fn: Listener) => () => void;
   reconnect: () => void;
+  send: (data: unknown) => void;
+  nextRequestId: () => string;
 };
 
 const Ctx = createContext<WsState | null>(null);
@@ -29,8 +31,11 @@ export function WsProvider({ children }: { children: ReactNode }) {
   const { token, refreshAuth } = useAuth();
   const [status, setStatus] = useState<WsState['status']>('idle');
   const connRef = useRef<{ close: () => void } | null>(null);
+  const sendRef = useRef<((data: unknown) => void) | null>(null);
   const listenersRef = useRef(new Set<Listener>());
   const [epoch, setEpoch] = useState(0);
+
+  const requestSeqRef = useRef(0);
 
   const recentCloseRef = useRef<{ at: number; count: number }>({
     at: Date.now(),
@@ -47,7 +52,17 @@ export function WsProvider({ children }: { children: ReactNode }) {
   const reconnect = useCallback(() => {
     connRef.current?.close();
     connRef.current = null;
+    sendRef.current = null;
     setEpoch((x) => x + 1);
+  }, []);
+
+  const send = useCallback((data: unknown) => {
+    sendRef.current?.(data);
+  }, []);
+
+  const nextRequestId = useCallback(() => {
+    requestSeqRef.current += 1;
+    return `${Date.now()}_${requestSeqRef.current}`;
   }, []);
 
   useEffect(() => {
@@ -59,7 +74,7 @@ export function WsProvider({ children }: { children: ReactNode }) {
     }
 
     connRef.current?.close();
-    connRef.current = connectBackendWs({
+    const conn = connectBackendWs({
       token,
       onStatus: (s) => {
         setStatus(s);
@@ -90,15 +105,19 @@ export function WsProvider({ children }: { children: ReactNode }) {
       },
     });
 
+    connRef.current = conn;
+    sendRef.current = conn.send;
+
     return () => {
       connRef.current?.close();
       connRef.current = null;
+      sendRef.current = null;
     };
   }, [token, epoch, refreshAuth]);
 
   const value = useMemo<WsState>(
-    () => ({ status, subscribe, reconnect }),
-    [status, subscribe, reconnect],
+    () => ({ status, subscribe, reconnect, send, nextRequestId }),
+    [status, subscribe, reconnect, send, nextRequestId],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

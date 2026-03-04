@@ -29,6 +29,8 @@ function isProtectedApiRoute(method: string, pathname: string): boolean {
   if (m === 'GET' && pathname === '/api/status') return true;
   if (m === 'GET' && pathname === '/api/security') return true;
 
+  if (m === 'GET' && pathname === '/api/notifications/diagnostics') return true;
+
   if (m === 'GET' && pathname === '/api/presets') return true;
   if (m === 'POST' && pathname === '/api/presets') return true;
   if (m === 'GET' && /^\/api\/presets\/[^/]+$/.test(pathname)) return true;

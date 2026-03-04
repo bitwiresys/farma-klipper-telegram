@@ -11,7 +11,6 @@ import { Chip } from '../components/ui/Chip';
 import { EmptyState } from '../components/ui/EmptyState';
 import { SearchInput } from '../components/ui/SearchInput';
 import { useAuth } from '../auth/auth_context';
-import { apiRequest } from '../lib/api';
 import { useWs } from '../ws/ws_context';
 
 type WsEvent = { type: string; payload: any };
@@ -53,31 +52,45 @@ export default function PresetsPage() {
     return m;
   }, [models]);
 
-  const load = async () => {
+  const requestAll = () => {
     if (!token) return;
     setErr(null);
-    const m = await apiRequest<{ models: PrinterModelRow[] }>(
-      '/api/printer-models',
-      {
-        token,
-      },
-    );
-    setModels(m.models);
-    const res = await apiRequest<{ presets: PresetDto[] }>('/api/presets', {
-      token,
+    ws.send({
+      type: 'REQ_PRINTER_MODELS',
+      payload: { requestId: ws.nextRequestId() },
     });
-    setPresets(res.presets);
+    ws.send({
+      type: 'REQ_PRESETS',
+      payload: { requestId: ws.nextRequestId() },
+    });
   };
 
   useEffect(() => {
-    void load();
+    requestAll();
   }, [token]);
 
   useEffect(() => {
     if (!token) return;
     return ws.subscribe((ev) => {
       const e = ev as WsEvent;
-      if (e.type === 'PRESET_UPDATED') void load();
+      if (e.type === 'PRINTER_MODELS_SNAPSHOT') {
+        const ms = (e.payload as any)?.models as PrinterModelRow[] | undefined;
+        if (!ms) return;
+        setModels(ms);
+        return;
+      }
+      if (e.type === 'PRESETS_SNAPSHOT') {
+        const ps = (e.payload as any)?.presets as PresetDto[] | undefined;
+        if (!ps) return;
+        setPresets(ps);
+        return;
+      }
+      if (e.type === 'PRESET_UPDATED') {
+        ws.send({
+          type: 'REQ_PRESETS',
+          payload: { requestId: ws.nextRequestId() },
+        });
+      }
     });
   }, [token, ws]);
 

@@ -205,6 +205,61 @@ export const WsPresetUpdatedPayloadSchema = z.object({
   presetId: z.string(),
 });
 
+export const WsHistoryQuerySchema = z.object({
+  status: z.enum(['all', 'completed', 'error', 'cancelled', 'in_progress']),
+  limit: z.number().int().min(1).max(200),
+  offset: z.number().int().min(0).max(10_000),
+});
+
+export const WsRequestBaseSchema = z.object({
+  requestId: z.string().min(1).max(120),
+});
+
+export const WsClientMessageSchema = z.discriminatedUnion('type', [
+  z.object({
+    type: z.literal('REQ_HISTORY'),
+    payload: WsRequestBaseSchema.merge(WsHistoryQuerySchema),
+  }),
+  z.object({
+    type: z.literal('REQ_PRESETS'),
+    payload: WsRequestBaseSchema,
+  }),
+  z.object({
+    type: z.literal('REQ_PRINTER_MODELS'),
+    payload: WsRequestBaseSchema,
+  }),
+]);
+
+export const WsPresetsSnapshotPayloadSchema = z.object({
+  presets: z.array(
+    z.object({
+      id: z.string(),
+      title: z.string(),
+      plasticType: z.string(),
+      colorHex: z.string(),
+      description: z.string().nullable(),
+      thumbnailUrl: z.string().nullable(),
+      gcodeMeta: z.any().nullable(),
+      compatibilityRules: z.object({
+        allowedModelIds: z.array(z.string()),
+        allowedNozzleDiameters: z.array(z.number()),
+        minBedX: z.number(),
+        minBedY: z.number(),
+      }),
+    }),
+  ),
+});
+
+export const WsPrinterModelsSnapshotPayloadSchema = z.object({
+  models: z.array(z.object({ id: z.string(), name: z.string() })),
+});
+
+export const WsHistorySnapshotPayloadSchema = z.object({
+  query: WsHistoryQuerySchema,
+  history: z.array(PrintHistoryDtoSchema),
+  total: z.number().int().min(0),
+});
+
 export const WsEventSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('PRINTERS_SNAPSHOT'),
@@ -221,5 +276,17 @@ export const WsEventSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('PRESET_UPDATED'),
     payload: WsPresetUpdatedPayloadSchema,
+  }),
+  z.object({
+    type: z.literal('PRESETS_SNAPSHOT'),
+    payload: WsRequestBaseSchema.merge(WsPresetsSnapshotPayloadSchema),
+  }),
+  z.object({
+    type: z.literal('PRINTER_MODELS_SNAPSHOT'),
+    payload: WsRequestBaseSchema.merge(WsPrinterModelsSnapshotPayloadSchema),
+  }),
+  z.object({
+    type: z.literal('HISTORY_SNAPSHOT'),
+    payload: WsRequestBaseSchema.merge(WsHistorySnapshotPayloadSchema),
   }),
 ]);

@@ -9,7 +9,7 @@ export function connectBackendWs(opts: {
   token: string;
   onEvent: (ev: WsEvent) => void;
   onStatus: (s: 'connecting' | 'open' | 'closed' | 'error') => void;
-}): { close: () => void } {
+}): { close: () => void; send: (data: unknown) => void } {
   const base = getBackendWsUrl();
   if (!base) throw new Error('NEXT_PUBLIC_BACKEND_WS_URL is not set');
 
@@ -71,6 +71,14 @@ export function connectBackendWs(opts: {
       stopped = true;
       try {
         ws?.close();
+      } catch {
+        return;
+      }
+    },
+    send: (data) => {
+      try {
+        if (!ws || ws.readyState !== WebSocket.OPEN) return;
+        ws.send(JSON.stringify(data));
       } catch {
         return;
       }

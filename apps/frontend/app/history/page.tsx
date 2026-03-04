@@ -11,7 +11,6 @@ import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Chip } from '../components/ui/Chip';
 import { useAuth } from '../auth/auth_context';
-import { apiRequest } from '../lib/api';
 import { getBackendBaseUrl } from '../lib/env';
 import { buildPrinterLabelById } from '../lib/printer_label';
 import { useWs } from '../ws/ws_context';
@@ -93,51 +92,75 @@ export default function HistoryPage() {
     return history.find((x) => x.id === activeId) ?? null;
   }, [activeId, history]);
 
-  const load = async (opts?: { reset?: boolean; pages?: number }) => {
+  const requestHistory = (opts?: { reset?: boolean; pages?: number }) => {
     if (!token) return;
     setErr(null);
-
-    const p = await apiRequest<{ printers: PrinterDto[] }>('/api/printers', {
-      token,
-    });
-    setPrinters(p.printers);
 
     const reset = opts?.reset ?? false;
     const nextPagesLoaded =
       typeof opts?.pages === 'number' ? opts.pages : reset ? 1 : pagesLoaded;
     const limit = PAGE_SIZE * nextPagesLoaded;
 
-    const qs = new URLSearchParams({
-      limit: String(limit),
-      offset: '0',
-      status,
+    const requestId = ws.nextRequestId();
+    ws.send({
+      type: 'REQ_HISTORY',
+      payload: {
+        requestId,
+        status,
+        limit,
+        offset: 0,
+      },
     });
-
-    const h = await apiRequest<{ history: PrintHistoryDto[] }>(
-      `/api/history?${qs.toString()}`,
-      { token },
-    );
     setPagesLoaded(nextPagesLoaded);
-    setHistory(h.history);
-    setHasMore(h.history.length === limit);
   };
 
   const loadMore = async () => {
     if (!token) return;
     const next = pagesLoaded + 1;
-    await load({ pages: next });
+    requestHistory({ pages: next });
   };
 
   useEffect(() => {
     setPagesLoaded(1);
-    void load({ reset: true });
+    requestHistory({ reset: true });
   }, [token, status]);
 
   useEffect(() => {
     if (!token) return;
     return ws.subscribe((ev) => {
-      if (ev.type !== 'HISTORY_EVENT') return;
-      void load({ reset: true });
+      const e = ev as any;
+
+      if (e.type === 'PRINTERS_SNAPSHOT') {
+        const ps = e.payload?.printers as PrinterDto[] | undefined;
+        if (!ps) return;
+        setPrinters(ps);
+        return;
+      }
+
+      if (e.type === 'HISTORY_SNAPSHOT') {
+        const q = e.payload?.query as
+          | { status: string; limit: number; offset: number }
+          | undefined;
+        const list = e.payload?.history as PrintHistoryDto[] | undefined;
+        const total = e.payload?.total as number | undefined;
+        if (!q || !list) return;
+
+        if (q.status !== status) return;
+        if (q.offset !== 0) return;
+
+        setHistory(list);
+        const computedHasMore =
+          typeof total === 'number'
+            ? q.offset + list.length < total
+            : list.length === q.limit;
+        setHasMore(computedHasMore);
+        return;
+      }
+
+      if (e.type === 'HISTORY_EVENT') {
+        requestHistory({ reset: true });
+        return;
+      }
     });
   }, [token, status, pagesLoaded, ws]);
 
