@@ -183,6 +183,7 @@ export const PrintHistoryDtoSchema = z.object({
   printerId: z.string(),
   filename: z.string(),
   status: z.nativeEnum(HistoryStatus),
+  thumbnailUrl: z.string().url().nullable().optional(),
   startedAt: z.string().datetime(),
   endedAt: z.string().datetime().nullable(),
   printDurationSec: z.number().nullable(),

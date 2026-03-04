@@ -121,6 +121,7 @@ export type PrintHistoryDto = {
   printerId: string;
   filename: string;
   status: PrintHistoryStatus;
+  thumbnailUrl?: string | null;
   startedAt: string;
   endedAt: string | null;
   printDurationSec: number | null;

@@ -48,7 +48,27 @@ if (-not $SkipBuild) {
 }
 
 if (-not $SkipMigrate) {
-  Invoke-Remote "set -e; cd $RepoDir; pnpm --filter @farma/backend prisma:deploy" 
+  # Reset SQLite DB and recreate schema without migrations.
+  # We intentionally avoid `prisma migrate deploy` here.
+  $cmd = @'
+set -e
+cd {0}/apps/backend
+set -a
+[ -f {0}/.env ] && . {0}/.env || true
+[ -f ./.env ] && . ./.env || true
+set +a
+
+DBURL="${DATABASE_URL:-file:./dev.db}"
+if echo "$DBURL" | grep -q '^file:'; then
+  DBPATH="${DBURL#file:}"
+  DBPATH="${DBPATH#./}"
+  rm -f "$DBPATH"
+fi
+
+pnpm prisma db push --force-reset --accept-data-loss
+'@ -f $RepoDir
+
+  Invoke-Remote $cmd
 }
 
 if (-not $SkipRestart) {

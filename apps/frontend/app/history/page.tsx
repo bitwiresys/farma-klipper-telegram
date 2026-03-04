@@ -171,17 +171,28 @@ export default function HistoryPage() {
               >
                 <Card className="p-3">
                   <div className="flex items-start gap-3">
-                    <div
-                      className={
-                        `mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border ` +
-                        `${statusBadge(h.status)} ${statusTone(h.status)}`
-                      }
-                    >
-                      {(() => {
-                        const Ico = statusIcon(h.status);
-                        return <Ico size={18} />;
-                      })()}
-                    </div>
+                    {h.thumbnailUrl ? (
+                      <div className="mt-0.5 h-9 w-9 shrink-0 overflow-hidden rounded-btn border border-border/60 bg-surface2">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={h.thumbnailUrl}
+                          alt="thumbnail"
+                          className="h-full w-full object-cover"
+                        />
+                      </div>
+                    ) : (
+                      <div
+                        className={
+                          `mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border ` +
+                          `${statusBadge(h.status)} ${statusTone(h.status)}`
+                        }
+                      >
+                        {(() => {
+                          const Ico = statusIcon(h.status);
+                          return <Ico size={18} />;
+                        })()}
+                      </div>
+                    )}
 
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-[14px] font-semibold text-textPrimary">

@@ -8,6 +8,43 @@ import { decryptApiKey } from './crypto_api_key.js';
 import { MoonrakerHttp } from './moonraker_http.js';
 import { logger } from './logger.js';
 
+function isSafeRelPath(p: string): boolean {
+  const s = String(p ?? '').trim();
+  if (!s) return false;
+  if (s.includes('..')) return false;
+  if (s.includes('\\')) return false;
+  if (s.startsWith('/')) return false;
+  return true;
+}
+
+function pickBestHistoryThumbRelativePath(job: any): string | null {
+  const thumbs = Array.isArray(job?.metadata?.thumbnails)
+    ? (job.metadata.thumbnails as any[])
+    : [];
+
+  const pool = thumbs
+    .map((t) => {
+      const rel =
+        typeof t?.relative_path === 'string'
+          ? t.relative_path
+          : typeof t?.thumbnail_path === 'string'
+            ? t.thumbnail_path
+            : null;
+      if (!rel) return null;
+      const width = typeof t?.width === 'number' ? t.width : null;
+      const height = typeof t?.height === 'number' ? t.height : null;
+      const area =
+        width !== null && height !== null ? Math.max(1, width * height) : 1;
+      return { rel, area };
+    })
+    .filter((x): x is { rel: string; area: number } => x !== null)
+    .filter((x) => isSafeRelPath(x.rel));
+
+  if (pool.length === 0) return null;
+  pool.sort((a, b) => b.area - a.area);
+  return pool[0].rel;
+}
+
 function normalizeMoonrakerHistoryStatus(raw: string): HistoryStatus {
   const s = String(raw ?? '').toLowerCase();
   if (s === 'completed') return HistoryStatus.completed;
@@ -29,6 +66,42 @@ function normalizeMoonrakerHistoryStatus(raw: string): HistoryStatus {
 }
 
 export async function registerHistoryRoutes(app: FastifyInstance) {
+  app.get('/api/history/thumbnail', async (req, reply) => {
+    const q = (req.query ?? {}) as { printerId?: string; path?: string };
+    const printerId = String(q.printerId ?? '').trim();
+    const rel = String(q.path ?? '').trim();
+
+    if (!printerId || !isSafeRelPath(rel)) {
+      return reply.code(400).send({ error: 'BAD_REQUEST' });
+    }
+
+    const printer = await prisma.printer.findUnique({
+      where: { id: printerId },
+      select: { baseUrl: true, apiKeyEncrypted: true },
+    });
+    if (!printer) return reply.code(404).send({ error: 'NOT_FOUND' });
+
+    const apiKey = decryptApiKey(
+      printer.apiKeyEncrypted,
+      env.PRINTER_API_KEY_ENC_KEY,
+    );
+    const http = new MoonrakerHttp({ baseUrl: printer.baseUrl, apiKey });
+
+    const bytes = await http.downloadFile({ root: 'gcodes', filename: rel });
+
+    const lower = rel.toLowerCase();
+    const ct =
+      lower.endsWith('.jpg') || lower.endsWith('.jpeg')
+        ? 'image/jpeg'
+        : lower.endsWith('.webp')
+          ? 'image/webp'
+          : 'image/png';
+
+    reply.header('Cache-Control', 'no-store');
+    reply.type(ct);
+    return reply.send(bytes);
+  });
+
   app.get('/api/history', async (req, reply) => {
     reply.header('X-History-Source', 'moonraker');
 
@@ -133,6 +206,15 @@ export async function registerHistoryRoutes(app: FastifyInstance) {
             printerId: p.id,
             filename,
             status,
+            thumbnailUrl: (() => {
+              const rel = pickBestHistoryThumbRelativePath(j);
+              if (!rel) return null;
+              const qs = new URLSearchParams({
+                printerId: p.id,
+                path: rel,
+              });
+              return `/api/history/thumbnail?${qs.toString()}`;
+            })(),
             startedAt: new Date(startedSec * 1000).toISOString(),
             endedAt:
               endedSec === null
