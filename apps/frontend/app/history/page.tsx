@@ -2,7 +2,6 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, CircleX, Clock, TriangleAlert } from 'lucide-react';
 
 import type { PrintHistoryDto, PrinterDto } from '../lib/dto';
 
@@ -34,27 +33,6 @@ function fmtDur(sec: number | null): string {
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
 
-function statusIcon(status: PrintHistoryDto['status']) {
-  if (status === 'completed') return CheckCircle2;
-  if (status === 'error') return TriangleAlert;
-  if (status === 'cancelled') return CircleX;
-  return Clock;
-}
-
-function statusTone(status: PrintHistoryDto['status']): string {
-  if (status === 'completed') return 'text-accentGreen';
-  if (status === 'error') return 'text-accentRed';
-  if (status === 'cancelled') return 'text-textMuted';
-  return 'text-accentAmber';
-}
-
-function statusBadge(status: PrintHistoryDto['status']): string {
-  if (status === 'completed') return 'border-success/25 bg-success/12';
-  if (status === 'error') return 'border-danger/25 bg-danger/12';
-  if (status === 'cancelled') return 'border-offlineGray/25 bg-offlineGray/12';
-  return 'border-warning/25 bg-warning/12';
-}
-
 function withCacheBust(url: string): string {
   const t = String(Date.now());
   return url.includes('?') ? `${url}&t=${t}` : `${url}?t=${t}`;
@@ -82,6 +60,7 @@ export default function HistoryPage() {
 
   const [open, setOpen] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   const printerLabelById = useMemo(() => {
     return buildPrinterLabelById(printers);
@@ -205,28 +184,18 @@ export default function HistoryPage() {
               >
                 <Card className="p-3">
                   <div className="flex items-start gap-3">
-                    {h.thumbnailUrl ? (
-                      <div className="mt-0.5 h-9 w-9 shrink-0 overflow-hidden rounded-btn border border-border/60 bg-surface2">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <div className="mt-0.5 h-9 w-9 shrink-0 overflow-hidden rounded-btn border border-border/60 bg-surface2">
+                      {h.thumbnailUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
                         <img
                           src={resolveThumbUrl(withCacheBust(h.thumbnailUrl))}
                           alt="thumbnail"
                           className="h-full w-full object-cover"
                         />
-                      </div>
-                    ) : (
-                      <div
-                        className={
-                          `mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border ` +
-                          `${statusBadge(h.status)} ${statusTone(h.status)}`
-                        }
-                      >
-                        {(() => {
-                          const Ico = statusIcon(h.status);
-                          return <Ico size={18} />;
-                        })()}
-                      </div>
-                    )}
+                      ) : (
+                        <div className="h-full w-full bg-surface" />
+                      )}
+                    </div>
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-[14px] font-semibold text-textPrimary">
                         {h.filename}
@@ -267,14 +236,18 @@ export default function HistoryPage() {
             {active && (
               <div className="space-y-3">
                 {active.thumbnailUrl && (
-                  <div className="overflow-hidden rounded-card border border-border/70 bg-surface2">
+                  <button
+                    type="button"
+                    className="block w-full overflow-hidden rounded-card border border-border/70 bg-surface2"
+                    onClick={() => setPreviewOpen(true)}
+                  >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={resolveThumbUrl(withCacheBust(active.thumbnailUrl))}
                       alt="thumbnail"
                       className="h-40 w-full object-cover"
                     />
-                  </div>
+                  </button>
                 )}
                 <div className="rounded-card border border-border/70 bg-surface2 p-3 text-xs">
                   <div className="flex items-start justify-between gap-3">
@@ -287,7 +260,7 @@ export default function HistoryPage() {
                           active.printerId}
                       </div>
                     </div>
-                    <div className={`shrink-0 ${statusTone(active.status)}`}>
+                    <div className="shrink-0 text-textSecondary">
                       {active.status}
                     </div>
                   </div>
@@ -336,6 +309,21 @@ export default function HistoryPage() {
               </div>
             )}
           </BottomSheet>
+
+          {previewOpen && active?.thumbnailUrl && (
+            <button
+              type="button"
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+              onClick={() => setPreviewOpen(false)}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={resolveThumbUrl(withCacheBust(active.thumbnailUrl))}
+                alt="preview"
+                className="max-h-[85vh] w-auto max-w-full rounded-card border border-border/60 bg-surface2 object-contain"
+              />
+            </button>
+          )}
         </>
       )}
     </>

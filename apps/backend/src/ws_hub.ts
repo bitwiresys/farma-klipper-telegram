@@ -15,6 +15,8 @@ import type WebSocket from 'ws';
 
 import { env } from './env.js';
 import { prisma } from './prisma.js';
+import { decryptApiKey } from './crypto_api_key.js';
+import { MoonrakerHttp } from './moonraker_http.js';
 import { printerRuntime } from './printer_runtime.js';
 
 type Client = {
@@ -70,6 +72,171 @@ function toHistoryDto(row: any): PrintHistoryDto {
       typeof row.filamentUsedMm === 'number' ? row.filamentUsedMm : null,
     errorMessage: row.errorMessage ?? null,
   };
+}
+
+function isSafeRelPath(p: string): boolean {
+  const s = String(p ?? '').trim();
+  if (!s) return false;
+  if (s.includes('..')) return false;
+  if (s.includes('\\')) return false;
+  if (s.startsWith('/')) return false;
+  return true;
+}
+
+function pickBestHistoryThumbRelativePath(job: any): string | null {
+  const thumbs = Array.isArray(job?.metadata?.thumbnails)
+    ? (job.metadata.thumbnails as any[])
+    : [];
+
+  const pool = thumbs
+    .map((t) => {
+      const rel =
+        typeof t?.relative_path === 'string'
+          ? t.relative_path
+          : typeof t?.thumbnail_path === 'string'
+            ? t.thumbnail_path
+            : null;
+      if (!rel) return null;
+      const width = typeof t?.width === 'number' ? t.width : null;
+      const height = typeof t?.height === 'number' ? t.height : null;
+      const area =
+        width !== null && height !== null ? Math.max(1, width * height) : 1;
+      return { rel, area };
+    })
+    .filter((x): x is { rel: string; area: number } => x !== null)
+    .filter((x) => isSafeRelPath(x.rel));
+
+  if (pool.length === 0) return null;
+  pool.sort((a, b) => b.area - a.area);
+  return pool[0].rel;
+}
+
+function normalizeMoonrakerHistoryStatus(raw: string): HistoryStatus {
+  const s = String(raw ?? '').toLowerCase();
+  if (s === 'completed') return HistoryStatus.completed;
+  if (s === 'cancelled') return HistoryStatus.cancelled;
+  if (s === 'in_progress') return HistoryStatus.in_progress;
+  if (
+    s === 'error' ||
+    s === 'klippy_shutdown' ||
+    s === 'klippy_disconnect' ||
+    s === 'interrupted'
+  ) {
+    return HistoryStatus.error;
+  }
+  if (s.includes('error') || s.includes('fail')) return HistoryStatus.error;
+  if (s.includes('cancel')) return HistoryStatus.cancelled;
+  if (s.includes('complete') || s.includes('finished'))
+    return HistoryStatus.completed;
+  return HistoryStatus.in_progress;
+}
+
+async function fetchHistoryFromMoonraker(opts: {
+  status: string;
+  take: number;
+  skip: number;
+}): Promise<{ history: PrintHistoryDto[]; total: number }> {
+  const printers = await prisma.printer.findMany({
+    select: { id: true, baseUrl: true, apiKeyEncrypted: true },
+  });
+
+  const statusRaw = String(opts.status ?? 'all')
+    .trim()
+    .toLowerCase();
+  const statusFilter: HistoryStatus | null =
+    statusRaw === 'completed'
+      ? HistoryStatus.completed
+      : statusRaw === 'error'
+        ? HistoryStatus.error
+        : statusRaw === 'cancelled'
+          ? HistoryStatus.cancelled
+          : statusRaw === 'in_progress'
+            ? HistoryStatus.in_progress
+            : null;
+
+  const perPrinterLimit = Math.min(200, opts.take + opts.skip);
+
+  const all: PrintHistoryDto[] = [];
+  for (const p of printers) {
+    try {
+      const apiKey = decryptApiKey(
+        p.apiKeyEncrypted,
+        env.PRINTER_API_KEY_ENC_KEY,
+      );
+      const http = new MoonrakerHttp({ baseUrl: p.baseUrl, apiKey });
+      const resp = (await http.get<any>(
+        `/server/history/list?limit=${perPrinterLimit}&start=0&order=desc`,
+        { timeoutMs: 15_000 },
+      )) as any;
+
+      const root = resp?.result ?? resp;
+      const jobs = Array.isArray(root?.jobs) ? (root.jobs as any[]) : [];
+      for (const j of jobs) {
+        const startedSec =
+          typeof j?.start_time === 'number' ? Math.floor(j.start_time) : null;
+        if (startedSec === null) continue;
+        const endedSec =
+          typeof j?.end_time === 'number' ? Math.floor(j.end_time) : null;
+
+        let status = normalizeMoonrakerHistoryStatus(String(j?.status ?? ''));
+        if (status === HistoryStatus.in_progress && endedSec !== null) {
+          status = HistoryStatus.completed;
+        }
+        if (statusFilter !== null && status !== statusFilter) continue;
+
+        const filename = String(j?.filename ?? 'unknown');
+        const printDurationSec =
+          typeof j?.print_duration === 'number'
+            ? Math.floor(j.print_duration)
+            : null;
+        const totalDurationSec =
+          typeof j?.total_duration === 'number'
+            ? Math.floor(j.total_duration)
+            : null;
+        const filamentUsedMm =
+          typeof j?.filament_used === 'number' ? j.filament_used : null;
+        const errorMessage = typeof j?.message === 'string' ? j.message : null;
+
+        if (
+          filename === 'unknown' &&
+          status === HistoryStatus.in_progress &&
+          endedSec === null &&
+          printDurationSec === null &&
+          totalDurationSec === null &&
+          filamentUsedMm === null &&
+          errorMessage === null
+        ) {
+          continue;
+        }
+
+        all.push({
+          id: `${p.id}:${String(j?.job_id ?? startedSec)}`,
+          printerId: p.id,
+          filename,
+          status,
+          thumbnailUrl: (() => {
+            const rel = pickBestHistoryThumbRelativePath(j);
+            if (!rel) return null;
+            const qs = new URLSearchParams({ printerId: p.id, path: rel });
+            return `/api/history/thumbnail?${qs.toString()}`;
+          })(),
+          startedAt: new Date(startedSec * 1000).toISOString(),
+          endedAt:
+            endedSec === null ? null : new Date(endedSec * 1000).toISOString(),
+          printDurationSec,
+          totalDurationSec,
+          filamentUsedMm,
+          errorMessage,
+        });
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  all.sort((a, b) => b.startedAt.localeCompare(a.startedAt));
+  const history = all.slice(opts.skip, opts.skip + opts.take);
+  return { history, total: all.length };
 }
 
 export class WsHub {
@@ -143,19 +310,32 @@ export class WsHub {
       );
 
       const take = 50;
-      const rows = await prisma.printHistory.findMany({
-        orderBy: { startedAt: 'desc' },
-        take,
-        skip: 0,
-      });
-      const total = await prisma.printHistory.count();
+      let historyRows: PrintHistoryDto[] = [];
+      let total = 0;
+      try {
+        const resp = await fetchHistoryFromMoonraker({
+          status: 'all',
+          take,
+          skip: 0,
+        });
+        historyRows = resp.history;
+        total = resp.total;
+      } catch {
+        const rows = await prisma.printHistory.findMany({
+          orderBy: { startedAt: 'desc' },
+          take,
+          skip: 0,
+        });
+        total = await prisma.printHistory.count();
+        historyRows = rows.map(toHistoryDto);
+      }
       client.send(
         JSON.stringify({
           type: 'HISTORY_SNAPSHOT',
           payload: {
             requestId: 'init',
             query: { status: 'all', limit: take, offset: 0 },
-            history: rows.map(toHistoryDto),
+            history: historyRows,
             total,
           },
         }),
@@ -201,21 +381,31 @@ export class WsHub {
       const status = msg.payload.status;
       const take = Math.min(200, Math.max(1, Math.floor(msg.payload.limit)));
       const skip = Math.max(0, Math.floor(msg.payload.offset));
-      const where =
-        status === 'all'
-          ? {}
-          : {
-              status,
-            };
-      const [rows, total] = await Promise.all([
-        prisma.printHistory.findMany({
-          where,
-          orderBy: { startedAt: 'desc' },
-          take,
-          skip,
-        }),
-        prisma.printHistory.count({ where }),
-      ]);
+      let rows: PrintHistoryDto[] = [];
+      let total = 0;
+      try {
+        const resp = await fetchHistoryFromMoonraker({ status, take, skip });
+        rows = resp.history;
+        total = resp.total;
+      } catch {
+        const where =
+          status === 'all'
+            ? {}
+            : {
+                status,
+              };
+        const [dbRows, dbTotal] = await Promise.all([
+          prisma.printHistory.findMany({
+            where,
+            orderBy: { startedAt: 'desc' },
+            take,
+            skip,
+          }),
+          prisma.printHistory.count({ where }),
+        ]);
+        rows = dbRows.map(toHistoryDto);
+        total = dbTotal;
+      }
 
       client.send(
         JSON.stringify({
@@ -223,7 +413,7 @@ export class WsHub {
           payload: {
             requestId: msg.payload.requestId,
             query: { status, limit: take, offset: skip },
-            history: rows.map(toHistoryDto),
+            history: rows,
             total,
           },
         }),

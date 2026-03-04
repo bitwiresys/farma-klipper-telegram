@@ -20,6 +20,7 @@ type GcodeMeta = {
   firstLayerHeight: number | null;
   layerHeight: number | null;
   objectHeight: number | null;
+  layerCount: number | null;
 };
 
 function deepMerge(target: unknown, patch: unknown): unknown {
@@ -632,6 +633,7 @@ export class PrinterRuntimeManager {
                   const objectHeight = numOrNull(
                     (metaObj as any)?.object_height,
                   );
+                  const layerCount = numOrNull((metaObj as any)?.layer_count);
                   this.metaByPrinter.set(printerId, {
                     filename: activeFilename,
                     meta: {
@@ -639,6 +641,7 @@ export class PrinterRuntimeManager {
                       firstLayerHeight,
                       layerHeight,
                       objectHeight,
+                      layerCount,
                     },
                   });
                 } catch (e) {
@@ -693,8 +696,32 @@ export class PrinterRuntimeManager {
             const flh = meta.meta.firstLayerHeight;
             const lh = meta.meta.layerHeight;
             const z = snapshot.position?.gcode?.z ?? null;
+            const layerCount = meta.meta.layerCount;
 
             if (
+              layerCount !== null &&
+              layerCount > 0 &&
+              z !== null &&
+              flh !== null &&
+              lh !== null &&
+              lh > 0
+            ) {
+              const layers = Math.floor(layerCount) || 0;
+              const current = Math.ceil((z - flh) / lh + 1) || 0;
+
+              if (layers > 0 && current > 0 && current <= layers) {
+                const early =
+                  printDurationSec === null ? true : printDurationSec < 120;
+                const plausibleEarly = current <= 10;
+                if (!early || plausibleEarly) {
+                  nextLayers = { current, total: layers };
+                } else {
+                  nextLayers = { current: null, total: null };
+                }
+              } else {
+                nextLayers = { current: null, total: null };
+              }
+            } else if (
               h !== null &&
               flh !== null &&
               lh !== null &&
