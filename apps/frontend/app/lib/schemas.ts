@@ -10,9 +10,6 @@ export const CreatePresetSchema = z.object({
   compatibilityRules: z
     .object({
       allowedModelIds: z.array(z.string()),
-      allowedNozzleDiameters: z.array(z.number()),
-      minBedX: z.number(),
-      minBedY: z.number(),
     })
     .strict(),
 });

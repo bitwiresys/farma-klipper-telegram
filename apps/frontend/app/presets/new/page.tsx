@@ -41,12 +41,6 @@ export default function NewPresetPage() {
   const [description, setDescription] = useState<string>('');
 
   const [allowedModelIds, setAllowedModelIds] = useState<string[]>([]);
-  const [allowedNozzleDiameters, setAllowedNozzleDiameters] = useState<
-    number[]
-  >([0.4]);
-  const [customNozzle, setCustomNozzle] = useState<string>('');
-  const [minBedX, setMinBedX] = useState<number>(10);
-  const [minBedY, setMinBedY] = useState<number>(10);
 
   const loadModels = async () => {
     if (!token) return;
@@ -99,25 +93,6 @@ export default function NewPresetPage() {
     );
   };
 
-  const toggleNozzle = (v: number) => {
-    setAllowedNozzleDiameters((prev) =>
-      prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v],
-    );
-  };
-
-  const addCustomNozzle = () => {
-    const n = Number(customNozzle);
-    if (!Number.isFinite(n) || n <= 0) return;
-    setAllowedNozzleDiameters((prev) =>
-      prev.includes(n) ? prev : [...prev, n],
-    );
-    setCustomNozzle('');
-  };
-
-  const sortedNozzles = useMemo(() => {
-    return [...allowedNozzleDiameters].sort((a, b) => a - b);
-  }, [allowedNozzleDiameters]);
-
   const [saving, setSaving] = useState(false);
 
   const submit = async () => {
@@ -139,9 +114,6 @@ export default function NewPresetPage() {
       sourceFilename,
       compatibilityRules: {
         allowedModelIds,
-        allowedNozzleDiameters: sortedNozzles,
-        minBedX,
-        minBedY,
       },
     };
 
@@ -323,64 +295,6 @@ export default function NewPresetPage() {
                   No models yet. Create models in Printers tab.
                 </div>
               )}
-            </div>
-
-            <div className="mt-3 text-xs text-textSecondary">
-              Allowed nozzle
-            </div>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {[0.2, 0.4, 0.6, 0.8].map((n) => (
-                <button
-                  key={n}
-                  className={
-                    'rounded-btn border border-border/45 bg-surface2/55 px-3 py-2 text-xs shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] ' +
-                    (allowedNozzleDiameters.includes(n)
-                      ? 'border-accentCyan/35 bg-accentCyan/10 text-accentCyan'
-                      : 'text-textSecondary')
-                  }
-                  onClick={() => toggleNozzle(n)}
-                  type="button"
-                >
-                  {n}
-                </button>
-              ))}
-            </div>
-
-            <div className="mt-3 flex gap-2">
-              <input
-                className="flex-1 rounded-btn border border-border/45 bg-surface2/55 p-3 text-xs text-textPrimary shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
-                placeholder="custom nozzle (e.g. 0.5)"
-                value={customNozzle}
-                onChange={(e) => setCustomNozzle(e.target.value)}
-              />
-              <Button variant="secondary" onClick={() => addCustomNozzle()}>
-                Add
-              </Button>
-            </div>
-            {fieldErrors['compatibilityRules.allowedNozzleDiameters'] && (
-              <div className="text-xs text-red-400">
-                {fieldErrors['compatibilityRules.allowedNozzleDiameters'].join(
-                  ', ',
-                )}
-              </div>
-            )}
-
-            <div className="mt-3 text-xs text-textSecondary">Min bed size</div>
-            <div className="mt-2 grid grid-cols-2 gap-2">
-              <input
-                className="w-full rounded-btn border border-border/45 bg-surface2/55 p-3 text-xs text-textPrimary shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
-                placeholder="minBedX"
-                value={minBedX}
-                type="number"
-                onChange={(e) => setMinBedX(Number(e.target.value))}
-              />
-              <input
-                className="w-full rounded-btn border border-border/45 bg-surface2/55 p-3 text-xs text-textPrimary shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
-                placeholder="minBedY"
-                value={minBedY}
-                type="number"
-                onChange={(e) => setMinBedY(Number(e.target.value))}
-              />
             </div>
           </Card>
 

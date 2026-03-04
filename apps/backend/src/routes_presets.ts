@@ -204,6 +204,33 @@ export async function registerPresetsRoutes(app: FastifyInstance) {
       apiKey: sourceApiKey,
     });
 
+    const allowedModelIds = Array.isArray(
+      parsed.data.compatibilityRules?.allowedModelIds,
+    )
+      ? parsed.data.compatibilityRules.allowedModelIds
+      : [];
+
+    const printersForModels =
+      allowedModelIds.length > 0
+        ? await prisma.printer.findMany({
+            where: { modelId: { in: allowedModelIds } },
+            select: { bedX: true, bedY: true },
+          })
+        : [];
+
+    const computedMinBed = printersForModels.reduce(
+      (acc, p) => {
+        return {
+          minBedX: Math.min(acc.minBedX, p.bedX),
+          minBedY: Math.min(acc.minBedY, p.bedY),
+        };
+      },
+      {
+        minBedX: Number.isFinite(sourcePrinter.bedX) ? sourcePrinter.bedX : 10,
+        minBedY: Number.isFinite(sourcePrinter.bedY) ? sourcePrinter.bedY : 10,
+      },
+    );
+
     // Download gcode immediately and store locally (project-owned)
     const gcodeBytes = await sourceHttp.downloadFile({
       root: 'gcodes',
@@ -225,16 +252,13 @@ export async function registerPresetsRoutes(app: FastifyInstance) {
         gcodePath: gcodeRel,
         gcodeMeta: Prisma.DbNull,
         allowedModels: {
-          create: parsed.data.compatibilityRules.allowedModelIds.map(
-            (modelId: string) => ({ modelId }),
-          ),
+          create: allowedModelIds.map((modelId: string) => ({ modelId })),
         },
         compatibilityRules: {
           create: {
-            minBedX: parsed.data.compatibilityRules.minBedX,
-            minBedY: parsed.data.compatibilityRules.minBedY,
-            allowedNozzleDiameters:
-              parsed.data.compatibilityRules.allowedNozzleDiameters,
+            minBedX: computedMinBed.minBedX,
+            minBedY: computedMinBed.minBedY,
+            allowedNozzleDiameters: [sourcePrinter.nozzleDiameter],
           },
         },
       },
@@ -251,6 +275,27 @@ export async function registerPresetsRoutes(app: FastifyInstance) {
         printerId: sourcePrinterId,
         remoteFilename: sourceFilename,
         http: sourceHttp,
+      });
+    } catch {
+      // best-effort
+    }
+
+    // After meta is fetched, align required nozzle to gcode metadata (if available).
+    try {
+      const updatedMeta = await prisma.preset.findUnique({
+        where: { id: created.id },
+      });
+      const nozzleFromMeta = Number(
+        (updatedMeta as any)?.gcodeMeta?.gcode_nozzle_diameter,
+      );
+      const requiredNozzle =
+        Number.isFinite(nozzleFromMeta) && nozzleFromMeta > 0
+          ? nozzleFromMeta
+          : sourcePrinter.nozzleDiameter;
+
+      await prisma.presetCompatibilityRules.update({
+        where: { presetId: created.id },
+        data: { allowedNozzleDiameters: [requiredNozzle] },
       });
     } catch {
       // best-effort
@@ -439,6 +484,46 @@ export async function registerPresetsRoutes(app: FastifyInstance) {
 
     const rules = parsed.data.compatibilityRules;
 
+    const nextAllowedModelIds =
+      rules && Array.isArray(rules.allowedModelIds)
+        ? rules.allowedModelIds
+        : null;
+
+    const printersForModels =
+      nextAllowedModelIds && nextAllowedModelIds.length > 0
+        ? await prisma.printer.findMany({
+            where: { modelId: { in: nextAllowedModelIds } },
+            select: { bedX: true, bedY: true },
+          })
+        : [];
+
+    const currentNozzleFromMeta = Number(
+      (existing as any)?.gcodeMeta?.gcode_nozzle_diameter,
+    );
+    const requiredNozzle =
+      Number.isFinite(currentNozzleFromMeta) && currentNozzleFromMeta > 0
+        ? currentNozzleFromMeta
+        : null;
+
+    const computedMinBed = printersForModels.reduce(
+      (acc, p) => {
+        return {
+          minBedX: Math.min(acc.minBedX, p.bedX),
+          minBedY: Math.min(acc.minBedY, p.bedY),
+        };
+      },
+      {
+        minBedX:
+          typeof (existing as any)?.compatibilityRules?.minBedX === 'number'
+            ? (existing as any).compatibilityRules.minBedX
+            : 10,
+        minBedY:
+          typeof (existing as any)?.compatibilityRules?.minBedY === 'number'
+            ? (existing as any).compatibilityRules.minBedY
+            : 10,
+      },
+    );
+
     const updated = await prisma.preset.update({
       where: { id },
       data: {
@@ -462,16 +547,19 @@ export async function registerPresetsRoutes(app: FastifyInstance) {
           ? existing.compatibilityRules
             ? {
                 update: {
-                  minBedX: rules.minBedX,
-                  minBedY: rules.minBedY,
-                  allowedNozzleDiameters: rules.allowedNozzleDiameters,
+                  minBedX: computedMinBed.minBedX,
+                  minBedY: computedMinBed.minBedY,
+                  ...(requiredNozzle !== null
+                    ? { allowedNozzleDiameters: [requiredNozzle] }
+                    : {}),
                 },
               }
             : {
                 create: {
-                  minBedX: rules.minBedX,
-                  minBedY: rules.minBedY,
-                  allowedNozzleDiameters: rules.allowedNozzleDiameters,
+                  minBedX: computedMinBed.minBedX,
+                  minBedY: computedMinBed.minBedY,
+                  allowedNozzleDiameters:
+                    requiredNozzle !== null ? [requiredNozzle] : [],
                 },
               }
           : undefined,

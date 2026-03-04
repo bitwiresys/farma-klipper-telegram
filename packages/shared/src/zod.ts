@@ -32,9 +32,6 @@ export const CreatePresetSchema = z.object({
   compatibilityRules: z
     .object({
       allowedModelIds: z.array(z.string()),
-      allowedNozzleDiameters: z.array(z.number()),
-      minBedX: z.number(),
-      minBedY: z.number(),
     })
     .strict(),
 });
@@ -48,9 +45,6 @@ export const UpdatePresetSchema = z
     compatibilityRules: z
       .object({
         allowedModelIds: z.array(z.string()),
-        allowedNozzleDiameters: z.array(z.number()),
-        minBedX: z.number(),
-        minBedY: z.number(),
       })
       .strict()
       .optional(),

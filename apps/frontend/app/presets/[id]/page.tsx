@@ -25,6 +25,25 @@ type PrintResultRow = {
   reasons: CompatibilityReason[];
 };
 
+function fmtPrinterLabel(input: {
+  displayName: string;
+  modelName: string;
+  nozzleDiameter: number;
+  bedX: number;
+  bedY: number;
+  index: number;
+}): string {
+  const name = String(input.displayName ?? '').trim();
+  const model = String(input.modelName ?? '').trim();
+  const nozzle = Number(input.nozzleDiameter);
+  const bedX = Math.round(Number(input.bedX));
+  const bedY = Math.round(Number(input.bedY));
+  const nozzleTxt = Number.isFinite(nozzle) ? nozzle.toFixed(1) : '?';
+  const bedTxt =
+    Number.isFinite(bedX) && Number.isFinite(bedY) ? `${bedX}x${bedY}` : '?x?';
+  return `${name}_${model}_${nozzleTxt}_${bedTxt}_#${input.index}`;
+}
+
 function reasonToText(r: CompatibilityReason): string {
   if (r === 'MODEL_NOT_ALLOWED') return 'Model not allowed';
   if (r === 'NOZZLE_NOT_ALLOWED') return 'Nozzle not allowed';
@@ -107,33 +126,61 @@ export default function PresetDetailPage() {
   const printersWithReasons = useMemo(() => {
     if (!preset)
       return [] as Array<{ p: PrinterDto; reasons: CompatibilityReason[] }>;
-    return printers
+    const sorted = printers
       .slice()
-      .sort((a, b) => a.displayName.localeCompare(b.displayName))
-      .map((p) => {
-        const reasons = computePresetCompatibilityReasons({
-          presetRules: preset.compatibilityRules,
-          printer: {
-            modelId: p.modelId,
-            nozzleDiameter: p.nozzleDiameter,
-            bedX: p.bedX,
-            bedY: p.bedY,
-            snapshot: p.snapshot as any,
-          },
-        });
-        return { p, reasons };
+      .sort((a, b) => a.displayName.localeCompare(b.displayName));
+
+    const idxByModel = new Map<string, number>();
+
+    return sorted.map((p) => {
+      const key = String(p.modelId ?? '');
+      const nextIdx = (idxByModel.get(key) ?? 0) + 1;
+      idxByModel.set(key, nextIdx);
+
+      const reasons = computePresetCompatibilityReasons({
+        presetRules: preset.compatibilityRules,
+        printer: {
+          modelId: p.modelId,
+          nozzleDiameter: p.nozzleDiameter,
+          bedX: p.bedX,
+          bedY: p.bedY,
+          snapshot: p.snapshot as any,
+        },
       });
+      const label = fmtPrinterLabel({
+        displayName: p.displayName,
+        modelName: p.modelName,
+        nozzleDiameter: p.nozzleDiameter,
+        bedX: p.bedX,
+        bedY: p.bedY,
+        index: nextIdx,
+      });
+
+      return { p, reasons, label };
+    });
   }, [printers, preset]);
 
   const selectablePrinterIds = useMemo(() => {
     return printersWithReasons
-      .filter((x) => x.reasons.length === 0)
+      .filter((x) => !x.reasons.includes('MODEL_NOT_ALLOWED'))
       .map((x) => x.p.id);
   }, [printersWithReasons]);
 
   const selectAllCompatible = () => {
     setSelected(new Set(selectablePrinterIds));
   };
+
+  const selectedBlocking = useMemo(() => {
+    const ids = selected;
+    const m = new Map<string, CompatibilityReason[]>();
+    for (const row of printersWithReasons) {
+      if (!ids.has(row.p.id)) continue;
+      if (row.reasons.length > 0) m.set(row.p.id, row.reasons);
+    }
+    return m;
+  }, [printersWithReasons, selected]);
+
+  const hasBlockingSelected = selectedBlocking.size > 0;
 
   useEffect(() => {
     if (!selectOpen) return;
@@ -172,7 +219,7 @@ export default function PresetDetailPage() {
         .filter((x) => printerIds.includes(x.p.id))
         .map((x) => ({
           printerId: x.p.id,
-          displayName: x.p.displayName,
+          displayName: (x as any).label ?? x.p.displayName,
           ok: true,
           reasons: [],
         }));
@@ -200,7 +247,7 @@ export default function PresetDetailPage() {
             const br = blocked.get(x.p.id) ?? [];
             return {
               printerId: x.p.id,
-              displayName: x.p.displayName,
+              displayName: (x as any).label ?? x.p.displayName,
               ok: br.length === 0,
               reasons: br,
             };
@@ -385,7 +432,7 @@ export default function PresetDetailPage() {
 
               <div className="space-y-2">
                 {printersWithReasons.map(({ p, reasons }) => {
-                  const disabled = reasons.length > 0;
+                  const disabled = reasons.includes('MODEL_NOT_ALLOWED');
                   const checked = selected.has(p.id);
 
                   return (
@@ -395,7 +442,9 @@ export default function PresetDetailPage() {
                         'w-full rounded-card border p-3 text-left ' +
                         (disabled
                           ? 'border-border/50 bg-surface2 text-textMuted'
-                          : 'border-border/70 bg-surface text-textPrimary')
+                          : reasons.length > 0
+                            ? 'border-warning/30 bg-warning/10 text-textPrimary'
+                            : 'border-border/70 bg-surface text-textPrimary')
                       }
                       disabled={disabled}
                       onClick={() => toggleSelected(p.id)}
@@ -404,7 +453,11 @@ export default function PresetDetailPage() {
                       <div className="flex items-start justify-between gap-2">
                         <div>
                           <div className="text-xs font-semibold">
-                            {p.displayName}
+                            {(
+                              printersWithReasons.find(
+                                (x) => x.p.id === p.id,
+                              ) as any
+                            )?.label ?? p.displayName}
                           </div>
                           <div className="mt-0.5 text-[11px] text-textSecondary">
                             {p.modelName}
@@ -424,8 +477,10 @@ export default function PresetDetailPage() {
                         </div>
                       </div>
 
-                      {disabled && (
-                        <div className="mt-2 text-[11px] text-accentRed">
+                      {reasons.length > 0 && (
+                        <div
+                          className={`mt-2 text-[11px] ${disabled ? 'text-accentRed' : 'text-warning'}`}
+                        >
                           {reasons.map(reasonToText).join(', ')}
                         </div>
                       )}
@@ -450,11 +505,19 @@ export default function PresetDetailPage() {
                   <Button
                     variant="primary"
                     onClick={() => setConfirmOpen(true)}
-                    disabled={printing || selected.size === 0}
+                    disabled={
+                      printing || selected.size === 0 || hasBlockingSelected
+                    }
                   >
                     Start on {selected.size}
                   </Button>
                 </div>
+                {hasBlockingSelected && (
+                  <div className="mt-2 text-[11px] text-warning">
+                    Remove printers with warnings (nozzle/bed/state) or fix them
+                    to start printing.
+                  </div>
+                )}
               </div>
             </div>
           </BottomSheet>
@@ -479,7 +542,11 @@ export default function PresetDetailPage() {
                       className="flex items-center justify-between rounded-card border border-border/45 bg-surface2/55 p-2 text-xs shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
                     >
                       <div className="font-medium text-textPrimary">
-                        {(p as PrinterDto).displayName}
+                        {(
+                          printersWithReasons.find(
+                            (x) => x.p.id === (p as PrinterDto).id,
+                          ) as any
+                        )?.label ?? (p as PrinterDto).displayName}
                       </div>
                       <div className="text-textSecondary">
                         {stateBadge((p as PrinterDto).snapshot.state)}
@@ -499,11 +566,16 @@ export default function PresetDetailPage() {
                 <Button
                   variant="primary"
                   onClick={() => void submitPrint()}
-                  disabled={printing}
+                  disabled={printing || hasBlockingSelected}
                 >
                   {printing ? 'Starting…' : 'Start print'}
                 </Button>
               </div>
+              {hasBlockingSelected && (
+                <div className="text-[11px] text-warning">
+                  Printing is blocked because selected printers have warnings.
+                </div>
+              )}
             </div>
           </BottomSheet>
         </>
