@@ -181,4 +181,10 @@ export async function registerPrintersRoutes(app: FastifyInstance) {
     const res = await printerRuntime.emergencyStop(id);
     return reply.send({ ok: true, res });
   });
+
+  app.post('/api/printers/:id/firmware_restart', async (req, reply) => {
+    const id = (req.params as any).id as string;
+    const res = await printerRuntime.firmwareRestart(id);
+    return reply.send({ ok: true, res });
+  });
 }

@@ -430,7 +430,13 @@ export async function registerPresetsRoutes(app: FastifyInstance) {
 
     const checksum = sha256Hex(gcodeBuf);
     const remoteDir = path.posix.join('tg_presets', presetId);
-    const remoteFilename = path.posix.join(remoteDir, `${checksum}.gcode`);
+    const safeTitle = String(preset.title ?? 'preset')
+      .trim()
+      .replace(/[^a-z0-9._-]+/gi, '_')
+      .replace(/^_+|_+$/g, '')
+      .slice(0, 50);
+    const remoteBase = `${safeTitle || 'preset'}_${checksum}.gcode`;
+    const remoteFilename = path.posix.join(remoteDir, remoteBase);
 
     await runWithConcurrency(2, printable, async (p) => {
       const printer = await prisma.printer.findUnique({ where: { id: p.id } });

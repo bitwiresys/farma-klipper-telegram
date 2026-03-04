@@ -14,7 +14,7 @@ import { InsetStat } from '../components/ui/InsetStat';
 import { ProgressBar } from '../components/ui/ProgressBar';
 import { StatusPill } from '../components/ui/StatusPill';
 import { useAuth } from '../auth/auth_context';
-import { apiRequest } from '../lib/api';
+import { apiRequest, type ApiError } from '../lib/api';
 import { useWs } from '../ws/ws_context';
 import { buildPrinterLabelById } from '../lib/printer_label';
 
@@ -79,28 +79,71 @@ export default function DashboardPage() {
   const pause = async (printerId: string) => {
     if (!token) return;
     setErr(null);
-    await apiRequest(`/api/printers/${printerId}/pause`, {
-      token,
-      method: 'POST',
-    });
+    try {
+      await apiRequest(`/api/printers/${printerId}/pause`, {
+        token,
+        method: 'POST',
+      });
+    } catch (e) {
+      const ae = e as ApiError;
+      setErr(ae.bodyText ?? String(e));
+    }
   };
 
   const resume = async (printerId: string) => {
     if (!token) return;
     setErr(null);
-    await apiRequest(`/api/printers/${printerId}/resume`, {
-      token,
-      method: 'POST',
-    });
+    try {
+      await apiRequest(`/api/printers/${printerId}/resume`, {
+        token,
+        method: 'POST',
+      });
+    } catch (e) {
+      const ae = e as ApiError;
+      setErr(ae.bodyText ?? String(e));
+    }
   };
 
   const cancel = async (printerId: string) => {
     if (!token) return;
     setErr(null);
-    await apiRequest(`/api/printers/${printerId}/cancel`, {
-      token,
-      method: 'POST',
-    });
+    try {
+      await apiRequest(`/api/printers/${printerId}/cancel`, {
+        token,
+        method: 'POST',
+      });
+    } catch (e) {
+      const ae = e as ApiError;
+      setErr(ae.bodyText ?? String(e));
+    }
+  };
+
+  const emergencyStop = async (printerId: string) => {
+    if (!token) return;
+    setErr(null);
+    try {
+      await apiRequest(`/api/printers/${printerId}/emergency_stop`, {
+        token,
+        method: 'POST',
+      });
+    } catch (e) {
+      const ae = e as ApiError;
+      setErr(ae.bodyText ?? String(e));
+    }
+  };
+
+  const firmwareRestart = async (printerId: string) => {
+    if (!token) return;
+    setErr(null);
+    try {
+      await apiRequest(`/api/printers/${printerId}/firmware_restart`, {
+        token,
+        method: 'POST',
+      });
+    } catch (e) {
+      const ae = e as ApiError;
+      setErr(ae.bodyText ?? String(e));
+    }
   };
 
   const load = async () => {
@@ -228,6 +271,12 @@ export default function DashboardPage() {
                   >
                     Cancel
                   </Button>
+                  <Button
+                    variant="destructive"
+                    onClick={() => void emergencyStop(p.id)}
+                  >
+                    E-Stop
+                  </Button>
                   {st === 'error' && (
                     <Button
                       variant="secondary"
@@ -242,6 +291,17 @@ export default function DashboardPage() {
                       Details
                     </Button>
                   )}
+                </div>
+              )}
+
+              {st === 'error' && (
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  <Button
+                    variant="secondary"
+                    onClick={() => void firmwareRestart(p.id)}
+                  >
+                    Firmware restart
+                  </Button>
                 </div>
               )}
 

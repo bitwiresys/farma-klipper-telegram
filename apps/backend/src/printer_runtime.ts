@@ -147,6 +147,7 @@ function computeSnapshotFromStatus(raw: RawStatus): {
   const ps = (raw.print_stats ?? {}) as Record<string, unknown>;
   const vsd = (raw.virtual_sdcard ?? {}) as Record<string, unknown>;
   const ds = (raw.display_status ?? {}) as Record<string, unknown>;
+  const webhooks = (raw.webhooks ?? {}) as Record<string, unknown>;
   const ext = (raw.extruder ?? {}) as Record<string, unknown>;
   const bed = (raw.heater_bed ?? {}) as Record<string, unknown>;
   const th = (raw.toolhead ?? {}) as Record<string, unknown>;
@@ -154,7 +155,16 @@ function computeSnapshotFromStatus(raw: RawStatus): {
   const mr = (raw.motion_report ?? {}) as Record<string, unknown>;
   const fan = (raw.fan ?? {}) as Record<string, unknown>;
 
-  const state = normalizePrinterState(strOrNull(ps.state));
+  let state = normalizePrinterState(strOrNull(ps.state));
+
+  const klippyState = strOrNull((webhooks as any).state);
+  const klippyMsg = strOrNull((webhooks as any).state_message);
+  if (klippyState) {
+    const wh = normalizePrinterState(klippyState);
+    if (wh === PrinterState.error || wh === PrinterState.offline) {
+      state = PrinterState.error;
+    }
+  }
 
   const filename = strOrNull(ps.filename) ?? strOrNull(vsd.filename);
 
@@ -228,13 +238,17 @@ function computeSnapshotFromStatus(raw: RawStatus): {
     maxAccel: numOrNull((th as any).max_accel),
   };
 
+  const messageFromPs = strOrNull((ps as any).message);
+  const message =
+    messageFromPs ?? (state === PrinterState.error ? klippyMsg : null) ?? null;
+
   return {
     snapshot: {
       state,
       filename,
       progress,
       etaSec: null,
-      message: strOrNull((ps as any).message),
+      message,
       temps,
       layers,
       position: {
@@ -893,6 +907,12 @@ export class PrinterRuntimeManager {
     const { baseUrl, apiKey } = await this.getPrinterSecrets(printerId);
     const http = new MoonrakerHttp({ baseUrl, apiKey });
     return http.post('/printer/emergency_stop');
+  }
+
+  async firmwareRestart(printerId: string) {
+    const { baseUrl, apiKey } = await this.getPrinterSecrets(printerId);
+    const http = new MoonrakerHttp({ baseUrl, apiKey });
+    return http.post('/printer/firmware_restart');
   }
 }
 
