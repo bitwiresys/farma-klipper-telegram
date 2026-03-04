@@ -8,6 +8,7 @@ export type PrinterState =
 export type PrinterSnapshotDto = {
   state: PrinterState;
   filename: string | null;
+  jobLabel?: string | null;
   progress: number | null;
   etaSec: number | null;
   message?: string | null;

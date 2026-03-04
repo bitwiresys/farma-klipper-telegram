@@ -34,14 +34,19 @@ function NavItem({
   label,
   icon,
   active,
+  activePrinter,
 }: {
   href: string;
   label: string;
   icon: ReactNode;
   active: boolean;
+  activePrinter?: any;
 }) {
   const pathname = usePathname();
   void pathname;
+  const filename =
+    ((activePrinter as any)?.snapshot?.jobLabel as string | null | undefined) ??
+    ((activePrinter as any)?.snapshot?.filename as string | null);
   return (
     <Link
       href={href}

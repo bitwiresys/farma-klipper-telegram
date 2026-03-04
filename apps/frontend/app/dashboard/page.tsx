@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import type { PrinterDto, PrintHistoryDto } from '../lib/dto';
 
@@ -16,6 +16,7 @@ import { StatusPill } from '../components/ui/StatusPill';
 import { useAuth } from '../auth/auth_context';
 import { apiRequest } from '../lib/api';
 import { useWs } from '../ws/ws_context';
+import { buildPrinterLabelById } from '../lib/printer_label';
 
 type WsEvent = { type: string; payload: any };
 
@@ -70,6 +71,10 @@ export default function DashboardPage() {
     printerName: string;
     filename: string;
   }>({ open: false, printerId: '', printerName: '', filename: '' });
+
+  const printerLabelById = useMemo(() => {
+    return buildPrinterLabelById(printers);
+  }, [printers]);
 
   const pause = async (printerId: string) => {
     if (!token) return;
@@ -152,7 +157,9 @@ export default function DashboardPage() {
           const showActions =
             st === 'printing' || st === 'paused' || st === 'error';
           const filename =
-            st === 'standby' ? '—' : (p.snapshot.filename ?? '—');
+            st === 'standby'
+              ? '—'
+              : (p.snapshot.jobLabel ?? p.snapshot.filename ?? '—');
           return (
             <Card
               key={p.id}
@@ -161,7 +168,7 @@ export default function DashboardPage() {
               <div className="flex items-start justify-between gap-3">
                 <Link href={`/printers/${p.id}`} className="block min-w-0">
                   <div className="truncate text-[16px] font-semibold text-textPrimary">
-                    {p.displayName}
+                    {printerLabelById.get(p.id) ?? p.displayName}
                   </div>
                   <div className="truncate text-xs text-textSecondary">
                     {p.modelName}
@@ -215,8 +222,10 @@ export default function DashboardPage() {
                       setCancelConfirm({
                         open: true,
                         printerId: p.id,
-                        printerName: p.displayName,
-                        filename: p.snapshot.filename ?? '—',
+                        printerName:
+                          printerLabelById.get(p.id) ?? p.displayName,
+                        filename:
+                          p.snapshot.jobLabel ?? p.snapshot.filename ?? '—',
                       })
                     }
                   >

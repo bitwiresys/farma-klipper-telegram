@@ -14,6 +14,7 @@ import { Switch } from '../../components/ui/Switch';
 import { useAuth } from '../../auth/auth_context';
 import { apiRequest, tryParseApiErrorBody, type ApiError } from '../../lib/api';
 import { useWs } from '../../ws/ws_context';
+import { buildPrinterLabelById } from '../../lib/printer_label';
 import type { CompatibilityReason, PresetDto, PrinterDto } from '../../lib/dto';
 
 type WsEvent = { type: string; payload: any };
@@ -24,25 +25,6 @@ type PrintResultRow = {
   ok: boolean;
   reasons: CompatibilityReason[];
 };
-
-function fmtPrinterLabel(input: {
-  displayName: string;
-  modelName: string;
-  nozzleDiameter: number;
-  bedX: number;
-  bedY: number;
-  index: number;
-}): string {
-  const name = String(input.displayName ?? '').trim();
-  const model = String(input.modelName ?? '').trim();
-  const nozzle = Number(input.nozzleDiameter);
-  const bedX = Math.round(Number(input.bedX));
-  const bedY = Math.round(Number(input.bedY));
-  const nozzleTxt = Number.isFinite(nozzle) ? nozzle.toFixed(1) : '?';
-  const bedTxt =
-    Number.isFinite(bedX) && Number.isFinite(bedY) ? `${bedX}x${bedY}` : '?x?';
-  return `${name}_${model}_${nozzleTxt}_${bedTxt}_#${input.index}`;
-}
 
 function reasonToText(r: CompatibilityReason): string {
   if (r === 'MODEL_NOT_ALLOWED') return 'Model not allowed';
@@ -138,39 +120,27 @@ export default function PresetDetailPage() {
   const printersWithReasons = useMemo(() => {
     if (!preset)
       return [] as Array<{ p: PrinterDto; reasons: CompatibilityReason[] }>;
-    const sorted = printers
+    return printers
       .slice()
-      .sort((a, b) => a.displayName.localeCompare(b.displayName));
-
-    const idxByModel = new Map<string, number>();
-
-    return sorted.map((p) => {
-      const key = String(p.modelId ?? '');
-      const nextIdx = (idxByModel.get(key) ?? 0) + 1;
-      idxByModel.set(key, nextIdx);
-
-      const reasons = computePresetCompatibilityReasons({
-        presetRules: preset.compatibilityRules,
-        printer: {
-          modelId: p.modelId,
-          nozzleDiameter: p.nozzleDiameter,
-          bedX: p.bedX,
-          bedY: p.bedY,
-          snapshot: p.snapshot as any,
-        },
+      .sort((a, b) => a.displayName.localeCompare(b.displayName))
+      .map((p) => {
+        const reasons = computePresetCompatibilityReasons({
+          presetRules: preset.compatibilityRules,
+          printer: {
+            modelId: p.modelId,
+            nozzleDiameter: p.nozzleDiameter,
+            bedX: p.bedX,
+            bedY: p.bedY,
+            snapshot: p.snapshot as any,
+          },
+        });
+        return { p, reasons };
       });
-      const label = fmtPrinterLabel({
-        displayName: p.displayName,
-        modelName: p.modelName,
-        nozzleDiameter: p.nozzleDiameter,
-        bedX: p.bedX,
-        bedY: p.bedY,
-        index: nextIdx,
-      });
-
-      return { p, reasons, label };
-    });
   }, [printers, preset]);
+
+  const labelById = useMemo(() => {
+    return buildPrinterLabelById(printers);
+  }, [printers]);
 
   const selectablePrinterIds = useMemo(() => {
     return printersWithReasons
@@ -231,7 +201,7 @@ export default function PresetDetailPage() {
         .filter((x) => printerIds.includes(x.p.id))
         .map((x) => ({
           printerId: x.p.id,
-          displayName: (x as any).label ?? x.p.displayName,
+          displayName: labelById.get(x.p.id) ?? x.p.displayName,
           ok: true,
           reasons: [],
         }));
@@ -259,7 +229,7 @@ export default function PresetDetailPage() {
             const br = blocked.get(x.p.id) ?? [];
             return {
               printerId: x.p.id,
-              displayName: (x as any).label ?? x.p.displayName,
+              displayName: labelById.get(x.p.id) ?? x.p.displayName,
               ok: br.length === 0,
               reasons: br,
             };
@@ -469,11 +439,7 @@ export default function PresetDetailPage() {
                       <div className="flex items-start justify-between gap-2">
                         <div>
                           <div className="text-xs font-semibold">
-                            {(
-                              printersWithReasons.find(
-                                (x) => x.p.id === p.id,
-                              ) as any
-                            )?.label ?? p.displayName}
+                            {labelById.get(p.id) ?? p.displayName}
                           </div>
                           <div className="mt-0.5 text-[11px] text-textSecondary">
                             {p.modelName}
@@ -558,11 +524,8 @@ export default function PresetDetailPage() {
                       className="flex items-center justify-between rounded-card border border-border/45 bg-surface2/55 p-2 text-xs shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
                     >
                       <div className="font-medium text-textPrimary">
-                        {(
-                          printersWithReasons.find(
-                            (x) => x.p.id === (p as PrinterDto).id,
-                          ) as any
-                        )?.label ?? (p as PrinterDto).displayName}
+                        {labelById.get((p as PrinterDto).id) ??
+                          (p as PrinterDto).displayName}
                       </div>
                       <div className="text-textSecondary">
                         {stateBadge((p as PrinterDto).snapshot.state)}

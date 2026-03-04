@@ -13,6 +13,7 @@ import { Chip } from '../components/ui/Chip';
 import { useAuth } from '../auth/auth_context';
 import { apiRequest } from '../lib/api';
 import { getBackendBaseUrl } from '../lib/env';
+import { buildPrinterLabelById } from '../lib/printer_label';
 import { useWs } from '../ws/ws_context';
 
 type StatusFilter = 'all' | 'completed' | 'error' | 'cancelled';
@@ -83,10 +84,8 @@ export default function HistoryPage() {
   const [open, setOpen] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
 
-  const printerNameById = useMemo(() => {
-    const m = new Map<string, string>();
-    for (const p of printers) m.set(p.id, p.displayName);
-    return m;
+  const printerLabelById = useMemo(() => {
+    return buildPrinterLabelById(printers);
   }, [printers]);
 
   const active = useMemo(() => {
@@ -213,7 +212,7 @@ export default function HistoryPage() {
                         {h.filename}
                       </div>
                       <div className="mt-0.5 text-xs text-textSecondary">
-                        {printerNameById.get(h.printerId) ?? h.printerId}
+                        {printerLabelById.get(h.printerId) ?? h.printerId}
                       </div>
 
                       <div className="mt-2 flex items-center justify-between gap-3 text-[11px] text-textMuted">
@@ -264,7 +263,7 @@ export default function HistoryPage() {
                         {active.filename}
                       </div>
                       <div className="mt-0.5 text-textSecondary">
-                        {printerNameById.get(active.printerId) ??
+                        {printerLabelById.get(active.printerId) ??
                           active.printerId}
                       </div>
                     </div>

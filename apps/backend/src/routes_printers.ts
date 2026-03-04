@@ -19,8 +19,50 @@ export async function registerPrintersRoutes(app: FastifyInstance) {
       bedZ: number;
       nozzleDiameter: number;
     }>;
+
+    const activePairs = printers
+      .map((p) => {
+        const snap = printerRuntime.getSnapshot(p.id);
+        const fn = String(snap.filename ?? '').trim();
+        return fn ? { printerId: p.id, filename: fn } : null;
+      })
+      .filter((x): x is { printerId: string; filename: string } => x !== null);
+
+    const deployments =
+      activePairs.length > 0
+        ? await prisma.presetDeployment.findMany({
+            where: {
+              OR: activePairs.map((x) => ({
+                printerId: x.printerId,
+                remoteFilename: x.filename,
+              })),
+            },
+            include: { preset: { select: { title: true } } },
+          })
+        : [];
+
+    const presetTitleByKey = new Map<string, string>();
+    for (const d of deployments) {
+      presetTitleByKey.set(
+        `${d.printerId}::${d.remoteFilename}`,
+        d.preset.title,
+      );
+    }
+
     return reply.send({
       printers: printers.map((p) => ({
+        ...((): any => {
+          const snap = printerRuntime.getSnapshot(p.id);
+          const fn = String(snap.filename ?? '').trim();
+          const key = fn ? `${p.id}::${fn}` : '';
+          const jobLabel = key ? (presetTitleByKey.get(key) ?? null) : null;
+          return {
+            snapshot: {
+              ...snap,
+              jobLabel,
+            },
+          };
+        })(),
         id: p.id,
         displayName: p.displayName,
         modelId: p.modelId,
@@ -30,7 +72,6 @@ export async function registerPrintersRoutes(app: FastifyInstance) {
         bedZ: p.bedZ,
         nozzleDiameter: p.nozzleDiameter,
         needsRekey: (p as any).needsRekey ?? false,
-        snapshot: printerRuntime.getSnapshot(p.id),
       })),
     });
   });

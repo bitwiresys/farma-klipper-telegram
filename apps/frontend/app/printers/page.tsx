@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import type { PrinterDto } from '../lib/dto';
 
@@ -13,6 +13,7 @@ import { ProgressBar } from '../components/ui/ProgressBar';
 import { StatusPill } from '../components/ui/StatusPill';
 import { useAuth } from '../auth/auth_context';
 import { apiRequest } from '../lib/api';
+import { buildPrinterLabelById } from '../lib/printer_label';
 
 function fmtNum(x: number | null | undefined, digits = 1): string {
   if (x === null || x === undefined) return '-';
@@ -45,6 +46,8 @@ export default function PrintersPage() {
   const [err, setErr] = useState<string | null>(null);
 
   const [printers, setPrinters] = useState<PrinterDto[]>([]);
+
+  const labelById = useMemo(() => buildPrinterLabelById(printers), [printers]);
 
   const load = async () => {
     if (!token) return;
@@ -82,7 +85,9 @@ export default function PrintersPage() {
         <div className="mt-3 space-y-3">
           {printers.map((p) => {
             const state = String((p.snapshot as any)?.state ?? 'offline');
-            const filename = (p.snapshot as any)?.filename as string | null;
+            const filename =
+              ((p.snapshot as any)?.jobLabel as string | null | undefined) ??
+              ((p.snapshot as any)?.filename as string | null);
             const progress = (p.snapshot as any)?.progress as number | null;
             const etaSec = (p.snapshot as any)?.etaSec as number | null;
             const layers = (p.snapshot as any)?.layers as
@@ -113,7 +118,7 @@ export default function PrintersPage() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="truncate text-[14px] font-semibold text-textPrimary">
-                        {p.displayName}
+                        {labelById.get(p.id) ?? p.displayName}
                       </div>
                       <div className="mt-1 text-xs text-textSecondary">
                         {p.modelName}

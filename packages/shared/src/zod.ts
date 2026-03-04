@@ -58,6 +58,7 @@ export const PrintPresetSchema = z.object({
 export const PrinterSnapshotSchema = z.object({
   state: z.nativeEnum(PrinterState),
   filename: z.string().nullable(),
+  jobLabel: z.string().nullable().optional(),
   progress: z.number().min(0).max(1).nullable(),
   etaSec: z.number().int().min(0).nullable(),
   message: z.string().nullable().optional(),
