@@ -171,7 +171,9 @@ export class NotificationService {
       if (snapshot.state !== PrinterState.printing) return false;
       if (layersHave) {
         return (
-          layers.current === 2 && (m.lastLayer === null || m.lastLayer < 2)
+          layers.current !== null &&
+          layers.current >= 2 &&
+          (m.lastLayer === null || m.lastLayer < 2)
         );
       }
       if (progress === null || printDurationSec === null) return false;
@@ -188,7 +190,7 @@ export class NotificationService {
         ),
         text: this.formatFirstLayer({
           displayName: await this.getPrinterDisplayName(printerId),
-          filename: snapshot.filename,
+          filename: (snapshot as any).jobLabel ?? snapshot.filename,
           etaSec: snapshot.etaSec,
           layers,
           layersHave,
@@ -209,7 +211,7 @@ export class NotificationService {
         ),
         text: this.formatComplete({
           displayName: await this.getPrinterDisplayName(printerId),
-          filename: snapshot.filename,
+          filename: (snapshot as any).jobLabel ?? snapshot.filename,
         }),
       });
     }
@@ -225,7 +227,7 @@ export class NotificationService {
         users: canNotify.filter((u) => u.notificationsEnabled && u.notifyError),
         text: this.formatError({
           displayName: await this.getPrinterDisplayName(printerId),
-          filename: snapshot.filename,
+          filename: (snapshot as any).jobLabel ?? snapshot.filename,
           printStatsMessage: strOrNull(printStats.message),
           webhooksStateMessage: strOrNull((webhooks as any).state_message),
           webhooksReason: strOrNull((webhooks as any).reason),

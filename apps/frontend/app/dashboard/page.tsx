@@ -170,9 +170,6 @@ export default function DashboardPage() {
                   <div className="truncate text-[16px] font-semibold text-textPrimary">
                     {printerLabelById.get(p.id) ?? p.displayName}
                   </div>
-                  <div className="truncate text-xs text-textSecondary">
-                    {p.modelName}
-                  </div>
                 </Link>
                 <StatusPill state={st} />
               </div>

@@ -88,20 +88,46 @@ export class PresetMetaService {
       }
     })();
 
-    const shouldFetchMeta = preset.gcodeMeta === null;
+    const shouldFetchMeta =
+      preset.gcodeMeta === null ||
+      typeof (preset as any).gcodeMeta !== 'object' ||
+      (preset as any).gcodeMeta === (null as any);
     if (!shouldFetchThumb && !shouldFetchMeta) return;
 
-    await input.http.post(
-      `/server/files/metascan?filename=${encodeURIComponent(input.remoteFilename)}`,
-    );
+    try {
+      await input.http.post(
+        `/server/files/metascan?filename=${encodeURIComponent(input.remoteFilename)}`,
+      );
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      logger.warn(
+        {
+          presetId: input.presetId,
+          remoteFilename: input.remoteFilename,
+          err: msg,
+        },
+        'moonraker metascan failed',
+      );
+    }
 
-    const meta = (await input.http.get<any>(
+    const metaRaw = (await input.http.get<any>(
       `/server/files/metadata?filename=${encodeURIComponent(input.remoteFilename)}`,
-    )) as MetadataResponse;
+    )) as any;
+    const meta: MetadataResponse =
+      metaRaw && typeof metaRaw === 'object' && (metaRaw as any).result
+        ? ((metaRaw as any).result as MetadataResponse)
+        : (metaRaw as MetadataResponse);
 
-    const thumbsRaw = await input.http.get<any>(
+    const thumbsRawAny = await input.http.get<any>(
       `/server/files/thumbnails?filename=${encodeURIComponent(input.remoteFilename)}`,
     );
+
+    const thumbsRaw =
+      thumbsRawAny &&
+      typeof thumbsRawAny === 'object' &&
+      (thumbsRawAny as any).result
+        ? (thumbsRawAny as any).result
+        : thumbsRawAny;
 
     const thumbs = Array.isArray(thumbsRaw)
       ? (thumbsRaw as ThumbnailDetails[])

@@ -10,6 +10,7 @@ import { Card } from '../../components/ui/Card';
 import { useAuth } from '../../auth/auth_context';
 import { apiRequest, tryParseApiErrorBody, type ApiError } from '../../lib/api';
 import type { PresetDto } from '../../lib/dto';
+import { buildPrinterLabelById } from '../../lib/printer_label';
 
 type FieldErrors = Record<string, string[]>;
 
@@ -30,7 +31,15 @@ export default function NewPresetPage() {
 
   const [models, setModels] = useState<Array<{ id: string; name: string }>>([]);
   const [printers, setPrinters] = useState<
-    Array<{ id: string; displayName: string }>
+    Array<{
+      id: string;
+      displayName: string;
+      modelId: string;
+      modelName: string;
+      bedX: number;
+      bedY: number;
+      nozzleDiameter: number;
+    }>
   >([]);
   const [history, setHistory] = useState<
     Array<{ printerId: string; filename: string }>
@@ -76,12 +85,25 @@ export default function NewPresetPage() {
   const loadPrinters = async () => {
     if (!token) return;
     const res = await apiRequest<{
-      printers: Array<{ id: string; displayName: string }>;
+      printers: Array<{
+        id: string;
+        displayName: string;
+        modelId: string;
+        modelName: string;
+        bedX: number;
+        bedY: number;
+        nozzleDiameter: number;
+      }>;
     }>('/api/printers', { token });
     setPrinters(
       (res.printers ?? []).map((p) => ({
         id: String(p.id),
         displayName: String(p.displayName),
+        modelId: String((p as any).modelId ?? ''),
+        modelName: String((p as any).modelName ?? ''),
+        bedX: Number((p as any).bedX ?? 0),
+        bedY: Number((p as any).bedY ?? 0),
+        nozzleDiameter: Number((p as any).nozzleDiameter ?? 0),
       })),
     );
   };
@@ -113,6 +135,10 @@ export default function NewPresetPage() {
     const extra = customPlastics.filter((x) => !base.includes(x as any));
     return [...base, ...extra];
   }, [customPlastics]);
+
+  const printerLabelById = useMemo(() => {
+    return buildPrinterLabelById(printers as any);
+  }, [printers]);
 
   const addCustomPlastic = () => {
     const v = customPlasticDraft.trim();
@@ -220,7 +246,7 @@ export default function NewPresetPage() {
                 <option value="">Printer…</option>
                 {printers.map((p) => (
                   <option key={p.id} value={p.id}>
-                    {p.displayName}
+                    {printerLabelById.get(p.id) ?? p.displayName}
                   </option>
                 ))}
               </select>

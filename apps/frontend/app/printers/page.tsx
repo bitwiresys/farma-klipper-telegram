@@ -120,9 +120,6 @@ export default function PrintersPage() {
                       <div className="truncate text-[14px] font-semibold text-textPrimary">
                         {labelById.get(p.id) ?? p.displayName}
                       </div>
-                      <div className="mt-1 text-xs text-textSecondary">
-                        {p.modelName}
-                      </div>
                       {(state === 'printing' || state === 'paused') &&
                         filename && (
                           <div className="mt-1 truncate text-[11px] text-textMuted">

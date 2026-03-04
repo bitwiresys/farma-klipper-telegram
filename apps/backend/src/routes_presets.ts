@@ -454,6 +454,25 @@ export async function registerPresetsRoutes(app: FastifyInstance) {
         checksumSha256: checksum,
       });
 
+      await prisma.presetDeployment.upsert({
+        where: {
+          presetId_printerId: {
+            presetId,
+            printerId: printer.id,
+          },
+        },
+        create: {
+          presetId,
+          printerId: printer.id,
+          remoteFilename,
+          checksumSha256: checksum,
+        },
+        update: {
+          remoteFilename,
+          checksumSha256: checksum,
+        },
+      });
+
       await presetMetaService.ensureMetaAndThumbnail({
         presetId,
         printerId: printer.id,

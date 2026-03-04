@@ -44,7 +44,8 @@ export async function registerSnapshotRoutes(app: FastifyInstance) {
       const snap = printerRuntime.getSnapshot(p.id);
       const fn = String(snap.filename ?? '').trim();
       const key = fn ? `${p.id}::${fn}` : '';
-      const jobLabel = key ? (presetTitleByKey.get(key) ?? null) : null;
+      const presetTitle = key ? (presetTitleByKey.get(key) ?? null) : null;
+      const jobLabel = presetTitle ? `preset: ${presetTitle}` : null;
       return {
         id: p.id,
         displayName: p.displayName,
