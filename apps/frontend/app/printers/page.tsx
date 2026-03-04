@@ -1,14 +1,16 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import type { PrinterDto } from '../lib/dto';
 
-import { BottomSheet } from '../components/ui/BottomSheet';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { EmptyState } from '../components/ui/EmptyState';
+import { InsetStat } from '../components/ui/InsetStat';
+import { ProgressBar } from '../components/ui/ProgressBar';
+import { StatusPill } from '../components/ui/StatusPill';
 import { useAuth } from '../auth/auth_context';
 import { apiRequest } from '../lib/api';
 
@@ -23,34 +25,9 @@ function fmtPct01(x: number | null | undefined): string {
   return `${Math.round(x * 100)}%`;
 }
 
-function fmtXYZ(p?: {
-  x: number | null;
-  y: number | null;
-  z: number | null;
-  e: number | null;
-}): string {
-  if (!p) return '-';
-  return `X ${fmtNum(p.x, 2)} Y ${fmtNum(p.y, 2)} Z ${fmtNum(p.z, 2)}`;
-}
-
-function statusText(p: PrinterDto): {
-  text: string;
-  tone: 'ok' | 'warn' | 'bad';
-} {
-  const state = String((p.snapshot as any)?.state ?? 'offline');
-  if (p.needsRekey) return { text: 'Rekey', tone: 'warn' };
-  if (state === 'offline') return { text: 'Offline', tone: 'bad' };
-  if (state === 'printing') return { text: 'Printing', tone: 'ok' };
-  if (state === 'paused') return { text: 'Paused', tone: 'warn' };
-  if (state === 'error') return { text: 'Error', tone: 'bad' };
-  if (state === 'standby') return { text: 'Ready', tone: 'ok' };
-  return { text: 'Not ready', tone: 'warn' };
-}
-
-function statusPill(st: { text: string; tone: 'ok' | 'warn' | 'bad' }): string {
-  if (st.tone === 'ok') return 'border-success/25 bg-success/12 text-success';
-  if (st.tone === 'bad') return 'border-danger/25 bg-danger/12 text-danger';
-  return 'border-warning/25 bg-warning/12 text-warning';
+function fmtPct100(x: number | null | undefined): string {
+  if (x === null || x === undefined) return '-';
+  return `${Math.round(x)}%`;
 }
 
 export default function PrintersPage() {
@@ -58,11 +35,6 @@ export default function PrintersPage() {
   const [err, setErr] = useState<string | null>(null);
 
   const [printers, setPrinters] = useState<PrinterDto[]>([]);
-
-  const [actionsOpen, setActionsOpen] = useState(false);
-  const [confirmRemoveOpen, setConfirmRemoveOpen] = useState(false);
-  const [activePrinterId, setActivePrinterId] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
 
   const load = async () => {
     if (!token) return;
@@ -76,23 +48,6 @@ export default function PrintersPage() {
   useEffect(() => {
     void load();
   }, [token]);
-
-  const removePrinter = async (id: string) => {
-    if (!token) return;
-    setErr(null);
-    setBusy(true);
-    try {
-      await apiRequest(`/api/printers/${id}`, { token, method: 'DELETE' });
-      await load();
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const active = useMemo(() => {
-    if (!activePrinterId) return null;
-    return printers.find((p) => p.id === activePrinterId) ?? null;
-  }, [activePrinterId, printers]);
 
   return (
     <>
@@ -116,43 +71,116 @@ export default function PrintersPage() {
       {token && (
         <div className="mt-3 space-y-3">
           {printers.map((p) => {
-            const st = statusText(p);
+            const state = String((p.snapshot as any)?.state ?? 'offline');
+            const filename = (p.snapshot as any)?.filename as string | null;
+            const progress = (p.snapshot as any)?.progress as number | null;
+            const etaSec = (p.snapshot as any)?.etaSec as number | null;
+            const layers = (p.snapshot as any)?.layers as
+              | { current: number | null; total: number | null }
+              | undefined;
+
+            const speedFactor = (p.snapshot as any)?.speed?.speedFactor as
+              | number
+              | null
+              | undefined;
+            const flowFactor = (p.snapshot as any)?.speed?.flowFactor as
+              | number
+              | null
+              | undefined;
+            const fan = (p.snapshot as any)?.fans?.part?.speed as
+              | number
+              | null
+              | undefined;
 
             return (
-              <Card key={p.id} className="p-3">
-                <div className="flex items-start justify-between gap-3">
-                  <Link href={`/printers/${p.id}`} className="min-w-0 flex-1">
-                    <div className="truncate text-[14px] font-semibold text-textPrimary">
-                      {p.displayName}
-                    </div>
-                    <div className="mt-0.5 text-xs text-textSecondary">
-                      {p.modelName}
-                    </div>
-                    <div className="mt-2">
-                      <div
-                        className={
-                          `inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold tracking-[0.12em] ` +
-                          statusPill(st)
-                        }
-                      >
-                        {st.text.toUpperCase()}
+              <Link key={p.id} href={`/printers/${p.id}`} className="block">
+                <Card className="p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="truncate text-[14px] font-semibold text-textPrimary">
+                        {filename ?? p.displayName}
+                      </div>
+                      <div className="mt-1 text-xs text-textSecondary">
+                        {p.displayName}
                       </div>
                     </div>
-                  </Link>
+                    <StatusPill state={state} />
+                  </div>
 
-                  <button
-                    className="h-11 w-11 rounded-btn border border-border/70 bg-surface2 text-xs text-textSecondary"
-                    onClick={() => {
-                      setActivePrinterId(p.id);
-                      setActionsOpen(true);
-                    }}
-                    type="button"
-                    aria-label="Actions"
-                  >
-                    ⋯
-                  </button>
-                </div>
-              </Card>
+                  <div className="mt-3 flex items-end justify-between gap-3">
+                    <div className="text-[28px] font-semibold leading-none text-textPrimary">
+                      {fmtPct01(progress)}
+                    </div>
+                    <div className="text-right text-xs text-textMuted">
+                      ETA{' '}
+                      {etaSec === null || etaSec === undefined
+                        ? '-'
+                        : `${Math.max(0, Math.floor(etaSec / 60))}m`}
+                    </div>
+                  </div>
+
+                  <div className="mt-3">
+                    <ProgressBar value01={progress ?? null} />
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    <InsetStat
+                      label="EXTRUDER"
+                      value={`${(p.snapshot as any)?.temps?.extruder ?? '—'}°C`}
+                      right={
+                        (p.snapshot as any)?.temps?.extruderTarget
+                          ? `target ${(p.snapshot as any)?.temps?.extruderTarget}`
+                          : undefined
+                      }
+                    />
+                    <InsetStat
+                      label="BED"
+                      value={`${(p.snapshot as any)?.temps?.bed ?? '—'}°C`}
+                      right={
+                        (p.snapshot as any)?.temps?.bedTarget
+                          ? `target ${(p.snapshot as any)?.temps?.bedTarget}`
+                          : undefined
+                      }
+                    />
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    <InsetStat
+                      label="LAYERS"
+                      value={`${layers?.current ?? '—'} / ${layers?.total ?? '—'}`}
+                    />
+                    <InsetStat
+                      label="STATE"
+                      value={String(state).toUpperCase()}
+                    />
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-3 gap-2">
+                    <InsetStat
+                      label="SPEED"
+                      value={fmtPct100(
+                        speedFactor === null || speedFactor === undefined
+                          ? null
+                          : speedFactor * 100,
+                      )}
+                    />
+                    <InsetStat
+                      label="FLOW"
+                      value={fmtPct100(
+                        flowFactor === null || flowFactor === undefined
+                          ? null
+                          : flowFactor * 100,
+                      )}
+                    />
+                    <InsetStat
+                      label="FAN"
+                      value={fmtPct100(
+                        fan === null || fan === undefined ? null : fan * 100,
+                      )}
+                    />
+                  </div>
+                </Card>
+              </Link>
             );
           })}
 
@@ -166,61 +194,6 @@ export default function PrintersPage() {
               }}
             />
           )}
-
-          {actionsOpen && active && (
-            <div className="mt-3">
-              <BottomSheet
-                open={actionsOpen}
-                onClose={() => setActionsOpen(false)}
-                title={active.displayName}
-              >
-                <div className="space-y-3">
-                  <div className="rounded-btn border border-border/70 bg-surface2 p-3 text-xs">
-                    <div className="text-textSecondary">Model</div>
-                    <div className="mt-1 text-textPrimary">
-                      {active.modelName}
-                    </div>
-                  </div>
-                </div>
-              </BottomSheet>
-            </div>
-          )}
-
-          <BottomSheet
-            open={confirmRemoveOpen}
-            onClose={() => setConfirmRemoveOpen(false)}
-            title="Remove printer?"
-          >
-            <div className="space-y-3">
-              <div className="text-xs text-textSecondary">
-                {active ? active.displayName : 'Printer'}
-              </div>
-              <div className="text-xs text-textMuted">
-                History and presets will stay.
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <Button
-                  variant="secondary"
-                  onClick={() => setConfirmRemoveOpen(false)}
-                  disabled={busy}
-                >
-                  Keep
-                </Button>
-                <Button
-                  variant="destructive"
-                  onClick={() => {
-                    if (!activePrinterId) return;
-                    void removePrinter(activePrinterId);
-                    setConfirmRemoveOpen(false);
-                    setActionsOpen(false);
-                  }}
-                  disabled={!activePrinterId || busy}
-                >
-                  Remove
-                </Button>
-              </div>
-            </div>
-          </BottomSheet>
         </div>
       )}
     </>

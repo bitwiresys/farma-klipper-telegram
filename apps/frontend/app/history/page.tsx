@@ -12,6 +12,7 @@ import { Card } from '../components/ui/Card';
 import { Chip } from '../components/ui/Chip';
 import { useAuth } from '../auth/auth_context';
 import { apiRequest } from '../lib/api';
+import { getBackendBaseUrl } from '../lib/env';
 import { useWs } from '../ws/ws_context';
 
 type StatusFilter = 'all' | 'completed' | 'error' | 'cancelled';
@@ -52,6 +53,20 @@ function statusBadge(status: PrintHistoryDto['status']): string {
   if (status === 'error') return 'border-danger/25 bg-danger/12';
   if (status === 'cancelled') return 'border-offlineGray/25 bg-offlineGray/12';
   return 'border-warning/25 bg-warning/12';
+}
+
+function withCacheBust(url: string): string {
+  const t = String(Date.now());
+  return url.includes('?') ? `${url}&t=${t}` : `${url}?t=${t}`;
+}
+
+function resolveThumbUrl(url: string): string {
+  const raw = String(url ?? '').trim();
+  if (!raw) return '';
+  if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
+  const base = (getBackendBaseUrl() ?? '').replace(/\/+$/, '');
+  if (!base) return raw;
+  return raw.startsWith('/') ? `${base}${raw}` : `${base}/${raw}`;
 }
 
 export default function HistoryPage() {
@@ -170,12 +185,13 @@ export default function HistoryPage() {
                 }}
               >
                 <Card className="p-3">
-                  <div className="flex items-start gap-3">
+                  <div className="flex items-resolveTsumbUrl(htart gap-3">
+                    )
                     {h.thumbnailUrl ? (
                       <div className="mt-0.5 h-9 w-9 shrink-0 overflow-hidden rounded-btn border border-border/60 bg-surface2">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
-                          src={h.thumbnailUrl}
+                          src={withCacheBust(h.thumbnailUrl)}
                           alt="thumbnail"
                           className="h-full w-full object-cover"
                         />
@@ -193,7 +209,6 @@ export default function HistoryPage() {
                         })()}
                       </div>
                     )}
-
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-[14px] font-semibold text-textPrimary">
                         {h.filename}
@@ -233,6 +248,17 @@ export default function HistoryPage() {
 
             {active && (
               <div className="space-y-3">
+                resolveThumbUrl()
+                {active.thumbnailUrl && (
+                  <div className="overflow-hidden rounded-card border border-border/70 bg-surface2">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={withCacheBust(active.thumbnailUrl)}
+                      alt="thumbnail"
+                      className="h-40 w-full object-cover"
+                    />
+                  </div>
+                )}
                 <div className="rounded-card border border-border/70 bg-surface2 p-3 text-xs">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
@@ -285,7 +311,6 @@ export default function HistoryPage() {
                     </div>
                   )}
                 </div>
-
                 <Link href={`/printers/${active.printerId}`} className="block">
                   <Button className="w-full" variant="secondary">
                     Open printer
