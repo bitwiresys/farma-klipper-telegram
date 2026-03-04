@@ -165,7 +165,8 @@ export async function registerHistoryRoutes(app: FastifyInstance) {
           { timeoutMs: 15_000 },
         )) as any;
 
-        const jobs = Array.isArray(resp?.jobs) ? (resp.jobs as any[]) : [];
+        const root = resp?.result ?? resp;
+        const jobs = Array.isArray(root?.jobs) ? (root.jobs as any[]) : [];
         for (const j of jobs) {
           const startedSec =
             typeof j?.start_time === 'number' ? Math.floor(j.start_time) : null;
