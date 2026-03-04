@@ -773,6 +773,60 @@ export class PrinterRuntimeManager {
 
           // Do not persist print history locally.
           // History must be fetched live from each printer's Moonraker.
+          const computedSessionId = startTimeSec
+            ? `${printerId}:${filename}:${Math.floor(startTimeSec)}`
+            : null;
+
+          const persistedSessionId =
+            computedSessionId ??
+            (printSessionId && printSessionId.includes(':')
+              ? printSessionId
+              : null);
+
+          try {
+            const existing = persistedSessionId
+              ? await prisma.printHistory.findFirst({
+                  where: { printerId, printSessionId: persistedSessionId },
+                })
+              : await prisma.printHistory.findFirst({
+                  where: { printerId, filename, startedAt },
+                });
+
+            if (existing) {
+              await prisma.printHistory.update({
+                where: { id: existing.id },
+                data: {
+                  filename,
+                  status,
+                  startedAt,
+                  endedAt,
+                  printDurationSec,
+                  totalDurationSec,
+                  filamentUsedMm,
+                  errorMessage,
+                  printSessionId: persistedSessionId ?? existing.printSessionId,
+                },
+              });
+            } else {
+              await prisma.printHistory.create({
+                data: {
+                  printerId,
+                  printSessionId: persistedSessionId,
+                  filename,
+                  status,
+                  startedAt,
+                  endedAt,
+                  printDurationSec,
+                  totalDurationSec,
+                  filamentUsedMm,
+                  errorMessage,
+                },
+              });
+            }
+          } catch {
+            // ignore
+          }
+
           this.onHistoryEvent?.(printerId, {
             id: `${printerId}:${printSessionId ?? printSessionIdRaw ?? filename}:${startedAt.getTime()}`,
             printerId,
