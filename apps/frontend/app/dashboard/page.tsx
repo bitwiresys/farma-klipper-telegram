@@ -151,6 +151,8 @@ export default function DashboardPage() {
           const st = p.snapshot.state;
           const showActions =
             st === 'printing' || st === 'paused' || st === 'error';
+          const filename =
+            st === 'standby' ? '—' : (p.snapshot.filename ?? '—');
           return (
             <Card
               key={p.id}
@@ -172,7 +174,7 @@ export default function DashboardPage() {
                 <ProgressBar value01={p.snapshot.progress} />
                 <div className="mt-2 flex items-center justify-between text-xs">
                   <div className="min-w-0 truncate text-textSecondary">
-                    {p.snapshot.filename ?? '—'}
+                    {filename}
                   </div>
                   <div className="shrink-0 text-textPrimary">
                     {fmtPct(p.snapshot.progress)}
@@ -235,6 +237,10 @@ export default function DashboardPage() {
                     </Button>
                   )}
                 </div>
+              )}
+
+              {st === 'standby' && (
+                <div className="mt-2 text-[11px] text-textMuted">Ready</div>
               )}
             </Card>
           );

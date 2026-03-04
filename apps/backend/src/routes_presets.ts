@@ -56,7 +56,9 @@ function presetToDto(p: any) {
     plasticType: p.plasticType,
     colorHex: p.colorHex,
     description: p.description ?? null,
-    thumbnailUrl: p.thumbnailPath ? `/api/presets/${p.id}/thumbnail` : null,
+    thumbnailUrl: p.thumbnailPath
+      ? `/api/presets/${p.id}/thumbnail?t=${new Date(p.updatedAt).getTime()}`
+      : null,
     gcodeMeta:
       p.gcodeMeta && typeof p.gcodeMeta === 'object'
         ? (p.gcodeMeta as any)
@@ -152,6 +154,7 @@ export async function registerPresetsRoutes(app: FastifyInstance) {
       reply.code(404).send({ error: 'NOT_FOUND' });
     });
 
+    reply.header('Cache-Control', 'no-store');
     // best-effort: default to png
     reply.type('image/png');
     return reply.send(stream);

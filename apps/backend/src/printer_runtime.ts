@@ -707,56 +707,19 @@ export class PrinterRuntimeManager {
               ? null
               : now;
 
-          const existing =
-            printSessionId === null
-              ? null
-              : await prisma.printHistory.findFirst({
-                  where: {
-                    printerId,
-                    printSessionId,
-                  },
-                });
-
-          const saved = existing
-            ? await prisma.printHistory.update({
-                where: { id: existing.id },
-                data: {
-                  filename,
-                  status,
-                  startedAt,
-                  endedAt,
-                  printDurationSec,
-                  totalDurationSec,
-                  filamentUsedMm,
-                  errorMessage,
-                },
-              })
-            : await prisma.printHistory.create({
-                data: {
-                  printerId,
-                  printSessionId,
-                  filename,
-                  status,
-                  startedAt,
-                  endedAt,
-                  printDurationSec,
-                  totalDurationSec,
-                  filamentUsedMm,
-                  errorMessage,
-                },
-              });
-
+          // Do not persist print history locally.
+          // History must be fetched live from each printer's Moonraker.
           this.onHistoryEvent?.(printerId, {
-            id: saved.id,
-            printerId: saved.printerId,
-            filename: saved.filename,
-            status: saved.status as HistoryStatus,
-            startedAt: saved.startedAt.toISOString(),
-            endedAt: saved.endedAt ? saved.endedAt.toISOString() : null,
-            printDurationSec: saved.printDurationSec,
-            totalDurationSec: saved.totalDurationSec,
-            filamentUsedMm: saved.filamentUsedMm,
-            errorMessage: saved.errorMessage,
+            id: `${printerId}:${printSessionId ?? printSessionIdRaw ?? filename}:${startedAt.getTime()}`,
+            printerId,
+            filename,
+            status,
+            startedAt: startedAt.toISOString(),
+            endedAt: endedAt ? endedAt.toISOString() : null,
+            printDurationSec,
+            totalDurationSec,
+            filamentUsedMm,
+            errorMessage,
           });
 
           if (

@@ -123,23 +123,7 @@ export default function HistoryPage() {
     if (!token) return;
     return ws.subscribe((ev) => {
       if (ev.type !== 'HISTORY_EVENT') return;
-      const p = ev.payload as any;
-      const h = p?.history as PrintHistoryDto | undefined;
-      if (!h) return;
-
-      if (status !== 'all' && h.status !== status) return;
-
-      setHistory((prev) => {
-        const maxItems = PAGE_SIZE * pagesLoaded;
-        const idx = prev.findIndex((x) => x.id === h.id);
-        if (idx !== -1) {
-          const copy = [...prev];
-          copy[idx] = h;
-          return copy;
-        }
-        const next = [h, ...prev];
-        return next.slice(0, maxItems);
-      });
+      void load({ reset: true });
     });
   }, [token, status, pagesLoaded, ws]);
 

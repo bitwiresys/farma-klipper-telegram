@@ -35,15 +35,12 @@ type MetadataResponse = {
 function pickBestThumbnail(
   thumbnails: ThumbnailDetails[],
 ): ThumbnailDetails | null {
-  const valid = thumbnails.filter((t) => {
+  const pool = thumbnails.filter((t) => {
     const w = Number(t.width);
     const h = Number(t.height);
     if (!Number.isFinite(w) || !Number.isFinite(h)) return false;
-    const max = Math.max(w, h);
-    return max <= 600;
+    return w > 0 && h > 0;
   });
-
-  const pool = valid.length > 0 ? valid : thumbnails;
   if (pool.length === 0) return null;
 
   let best = pool[0];
@@ -112,9 +109,12 @@ export class PresetMetaService {
         typeof best.thumbnail_path === 'string' &&
         best.thumbnail_path
       ) {
+        const thumbPath = best.thumbnail_path
+          .replace(/^\/+/, '')
+          .replace(/^gcodes\/+/, '');
         const bytes = await input.http.downloadFile({
           root: 'gcodes',
-          filename: best.thumbnail_path,
+          filename: thumbPath,
         });
 
         const outRel = path.posix.join('presets', input.presetId, 'thumb.png');

@@ -246,7 +246,7 @@ export default function PresetDetailPage() {
                 />
               ) : (
                 <div className="flex h-full w-full items-center justify-center text-xs text-textMuted">
-                  Thumbnail will appear after first deploy
+                  —
                 </div>
               )}
             </div>

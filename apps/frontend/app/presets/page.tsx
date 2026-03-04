@@ -16,6 +16,11 @@ import { useWs } from '../ws/ws_context';
 
 type WsEvent = { type: string; payload: any };
 
+type PrinterModelRow = {
+  id: string;
+  name: string;
+};
+
 function fmtNozzle(xs: number[]): string {
   if (xs.length === 0) return 'nozzle any';
   const sorted = [...xs].sort((a, b) => a - b);
@@ -27,11 +32,25 @@ export default function PresetsPage() {
   const ws = useWs();
   const [err, setErr] = useState<string | null>(null);
   const [presets, setPresets] = useState<PresetDto[]>([]);
+  const [models, setModels] = useState<PrinterModelRow[]>([]);
   const [query, setQuery] = useState('');
+
+  const modelNameById = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const x of models) m.set(x.id, x.name);
+    return m;
+  }, [models]);
 
   const load = async () => {
     if (!token) return;
     setErr(null);
+    const m = await apiRequest<{ models: PrinterModelRow[] }>(
+      '/api/printer-models',
+      {
+        token,
+      },
+    );
+    setModels(m.models);
     const res = await apiRequest<{ presets: PresetDto[] }>('/api/presets', {
       token,
     });
@@ -117,7 +136,9 @@ export default function PresetsPage() {
                     </Link>
 
                     <div className="mt-1 flex items-center gap-2">
-                      <Chip>{p.plasticType}</Chip>
+                      <div className="inline-flex items-center rounded-full border border-border/45 bg-surface2/55 px-2 py-1 text-[10px] font-semibold tracking-[0.12em] text-textSecondary shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+                        {p.plasticType}
+                      </div>
                       <div
                         className="h-4 w-4 rounded-full border border-border/70"
                         style={{ background: p.colorHex || '#ffffff' }}
@@ -128,10 +149,13 @@ export default function PresetsPage() {
                     <div className="mt-2 flex flex-wrap gap-2">
                       <Chip>
                         {p.compatibilityRules.allowedModelIds.length > 0
-                          ? 'models'
-                          : 'models any'}
+                          ? p.compatibilityRules.allowedModelIds
+                              .map((id) => modelNameById.get(id) ?? id)
+                              .join(', ')
+                          : 'Any model'}
                       </Chip>
                       <Chip>
+                        Nozzle{' '}
                         {fmtNozzle(p.compatibilityRules.allowedNozzleDiameters)}
                       </Chip>
                       <Chip>

@@ -12,6 +12,12 @@ function pillStyle(state: PrinterState | string): string {
 }
 
 export function StatusPill({ state }: { state: PrinterState | string }) {
+  const label = (() => {
+    const s = String(state);
+    if (s === 'standby') return 'READY';
+    return s.toUpperCase();
+  })();
+
   return (
     <div
       className={
@@ -19,7 +25,7 @@ export function StatusPill({ state }: { state: PrinterState | string }) {
         `${pillStyle(state)}`
       }
     >
-      {String(state).toUpperCase()}
+      {label}
     </div>
   );
 }
