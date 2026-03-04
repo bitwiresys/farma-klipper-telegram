@@ -52,9 +52,9 @@ if (-not $SkipMigrate) {
   # We intentionally avoid `prisma migrate deploy` here.
   $cmd = @'
 set -e
-cd {0}/apps/backend
+cd __REPO__/apps/backend
 set -a
-[ -f {0}/.env ] && . {0}/.env || true
+[ -f __REPO__/.env ] && . __REPO__/.env || true
 [ -f ./.env ] && . ./.env || true
 set +a
 
@@ -66,7 +66,9 @@ if echo "$DBURL" | grep -q '^file:'; then
 fi
 
 pnpm prisma db push --force-reset --accept-data-loss
-'@ -f $RepoDir
+'@
+
+  $cmd = $cmd.Replace('__REPO__', $RepoDir)
 
   Invoke-Remote $cmd
 }

@@ -141,6 +141,15 @@ export async function registerHistoryRoutes(app: FastifyInstance) {
       },
     });
 
+    reply.header('X-History-Printers-Count', String(printers.length));
+
+    if (printers.length === 0) {
+      return reply.send({
+        history: [],
+        warning: 'NO_PRINTERS_CONFIGURED',
+      });
+    }
+
     const perPrinterLimit = Math.min(200, take + skip);
 
     const all: PrintHistoryDto[] = [];
@@ -238,6 +247,8 @@ export async function registerHistoryRoutes(app: FastifyInstance) {
 
     all.sort((a, b) => b.startedAt.localeCompare(a.startedAt));
     const result = all.slice(skip, skip + take);
+
+    reply.header('X-History-Jobs-Total', String(all.length));
     return reply.send({ history: result });
   });
 }
