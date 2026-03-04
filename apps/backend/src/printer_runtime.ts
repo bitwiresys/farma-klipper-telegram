@@ -63,6 +63,11 @@ function strOrNull(x: unknown): string | null {
   return x;
 }
 
+function boolOrNull(x: unknown): boolean | null {
+  if (typeof x !== 'boolean') return null;
+  return x;
+}
+
 function arrNumAtOrNull(x: unknown, idx: number): number | null {
   if (!Array.isArray(x)) return null;
   const v = x[idx];
@@ -157,6 +162,14 @@ function computeSnapshotFromStatus(raw: RawStatus): {
   const fan = (raw.fan ?? {}) as Record<string, unknown>;
 
   let state = normalizePrinterState(strOrNull(ps.state));
+
+  const sdIsActive = boolOrNull((vsd as any).is_active) ?? false;
+  if (
+    (state === PrinterState.printing || state === PrinterState.paused) &&
+    !sdIsActive
+  ) {
+    state = PrinterState.standby;
+  }
 
   const klippyState = strOrNull((webhooks as any).state);
   const klippyMsg = strOrNull((webhooks as any).state_message);
