@@ -9,6 +9,9 @@ import type { PrinterDto } from '../../lib/dto';
 import { BottomSheet } from '../../components/ui/BottomSheet';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
+import { InsetStat } from '../../components/ui/InsetStat';
+import { ProgressBar } from '../../components/ui/ProgressBar';
+import { StatusPill } from '../../components/ui/StatusPill';
 import { useAuth } from '../../auth/auth_context';
 import { apiRequest, tryParseApiErrorBody, type ApiError } from '../../lib/api';
 import { useWs } from '../../ws/ws_context';
@@ -176,26 +179,58 @@ export default function PrinterDetailsPage() {
       {token && printer && (
         <div className="mt-3 space-y-3">
           <Card className="p-3">
-            <div className="text-xs font-medium text-textPrimary">Status</div>
-            <div className="mt-2 text-xs text-textSecondary">
-              Live: {String(state)}
-            </div>
-            <div className="mt-2 text-xs text-textMuted">
-              File: {printer.snapshot.filename ?? '—'}
-            </div>
-            <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
-              <div className="rounded-btn border border-border/70 bg-surface2 p-2">
-                <div className="text-textMuted">Progress</div>
-                <div className="text-textPrimary">
-                  {fmtPct01(printer.snapshot.progress)}
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="truncate text-[14px] font-semibold text-textPrimary">
+                  {printer.snapshot.filename ?? printer.displayName}
+                </div>
+                <div className="mt-1 text-xs text-textSecondary">
+                  {printer.displayName}
                 </div>
               </div>
-              <div className="rounded-btn border border-border/70 bg-surface2 p-2">
-                <div className="text-textMuted">ETA</div>
-                <div className="text-textPrimary">
-                  {fmtEta(printer.snapshot.etaSec)}
-                </div>
+              <StatusPill state={state} />
+            </div>
+
+            <div className="mt-3 flex items-end justify-between gap-3">
+              <div className="text-[28px] font-semibold leading-none text-textPrimary">
+                {fmtPct01(printer.snapshot.progress)}
               </div>
+              <div className="text-right text-xs text-textMuted">
+                ETA {fmtEta(printer.snapshot.etaSec)}
+              </div>
+            </div>
+
+            <div className="mt-3">
+              <ProgressBar value01={printer.snapshot.progress} />
+            </div>
+
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <InsetStat
+                label="EXTRUDER"
+                value={`${printer.snapshot.temps.extruder ?? '—'}°C`}
+                right={
+                  printer.snapshot.temps.extruderTarget
+                    ? `target ${printer.snapshot.temps.extruderTarget}`
+                    : undefined
+                }
+              />
+              <InsetStat
+                label="BED"
+                value={`${printer.snapshot.temps.bed ?? '—'}°C`}
+                right={
+                  printer.snapshot.temps.bedTarget
+                    ? `target ${printer.snapshot.temps.bedTarget}`
+                    : undefined
+                }
+              />
+            </div>
+
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <InsetStat
+                label="LAYERS"
+                value={`${printer.snapshot.layers.current ?? '—'} / ${printer.snapshot.layers.total ?? '—'}`}
+              />
+              <InsetStat label="STATE" value={String(state).toUpperCase()} />
             </div>
           </Card>
 
@@ -203,7 +238,7 @@ export default function PrinterDetailsPage() {
             <div className="text-xs font-medium text-textPrimary">Fields</div>
             <div className="mt-2 grid gap-2">
               <input
-                className="w-full rounded-btn border border-border/70 bg-surface2 p-3 text-xs"
+                className="w-full rounded-btn border border-border/45 bg-surface2/55 p-3 text-xs text-textPrimary shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
                 placeholder="Display name"
                 value={displayName}
                 onChange={(e) => {
@@ -212,7 +247,7 @@ export default function PrinterDetailsPage() {
               />
 
               <select
-                className="w-full rounded-btn border border-border/70 bg-surface2 p-3 text-xs"
+                className="w-full rounded-btn border border-border/45 bg-surface2/55 p-3 text-xs text-textPrimary shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
                 value={modelId}
                 onChange={(e) => {
                   setModelId(e.target.value);
@@ -227,7 +262,7 @@ export default function PrinterDetailsPage() {
               </select>
 
               <input
-                className="w-full rounded-btn border border-border/70 bg-surface2 p-3 text-xs"
+                className="w-full rounded-btn border border-border/45 bg-surface2/55 p-3 text-xs text-textPrimary shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
                 placeholder="Moonraker URL (leave empty to keep current)"
                 value={moonrakerBaseUrl}
                 onChange={(e) => {
@@ -237,7 +272,7 @@ export default function PrinterDetailsPage() {
 
               <div className="flex gap-2">
                 <input
-                  className="flex-1 rounded-btn border border-border/70 bg-surface2 p-3 text-xs"
+                  className="flex-1 rounded-btn border border-border/45 bg-surface2/55 p-3 text-xs text-textPrimary shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
                   placeholder="API Key (leave empty to keep current)"
                   type={showKey ? 'text' : 'password'}
                   value={moonrakerApiKey}
@@ -260,14 +295,14 @@ export default function PrinterDetailsPage() {
               Detected specs
             </div>
             <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
-              <div className="rounded-btn border border-border/70 bg-surface2 p-2">
+              <div className="rounded-btn border border-border/45 bg-surface2/55 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
                 <div className="text-textMuted">Bed size</div>
                 <div className="text-textPrimary">
                   {fmtNum(printer.bedX, 0)}×{fmtNum(printer.bedY, 0)}×
                   {fmtNum(printer.bedZ, 0)}
                 </div>
               </div>
-              <div className="rounded-btn border border-border/70 bg-surface2 p-2">
+              <div className="rounded-btn border border-border/45 bg-surface2/55 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
                 <div className="text-textMuted">Nozzle</div>
                 <div className="text-textPrimary">
                   {fmtNum(printer.nozzleDiameter, 2)}

@@ -47,6 +47,12 @@ function statusText(p: PrinterDto): {
   return { text: 'Not ready', tone: 'warn' };
 }
 
+function statusPill(st: { text: string; tone: 'ok' | 'warn' | 'bad' }): string {
+  if (st.tone === 'ok') return 'border-success/25 bg-success/12 text-success';
+  if (st.tone === 'bad') return 'border-danger/25 bg-danger/12 text-danger';
+  return 'border-warning/25 bg-warning/12 text-warning';
+}
+
 export default function PrintersPage() {
   const { token } = useAuth();
   const [err, setErr] = useState<string | null>(null);
@@ -111,12 +117,6 @@ export default function PrintersPage() {
         <div className="mt-3 space-y-3">
           {printers.map((p) => {
             const st = statusText(p);
-            const dotClass =
-              st.tone === 'ok'
-                ? 'bg-accentGreen'
-                : st.tone === 'bad'
-                  ? 'bg-accentRed'
-                  : 'bg-accentAmber';
 
             return (
               <Card key={p.id} className="p-3">
@@ -128,9 +128,15 @@ export default function PrintersPage() {
                     <div className="mt-0.5 text-xs text-textSecondary">
                       {p.modelName}
                     </div>
-                    <div className="mt-2 flex items-center gap-2 text-xs text-textSecondary">
-                      <div className={`h-2 w-2 rounded-full ${dotClass}`} />
-                      <div>{st.text}</div>
+                    <div className="mt-2">
+                      <div
+                        className={
+                          `inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-semibold tracking-[0.12em] ` +
+                          statusPill(st)
+                        }
+                      >
+                        {st.text.toUpperCase()}
+                      </div>
                     </div>
                   </Link>
 

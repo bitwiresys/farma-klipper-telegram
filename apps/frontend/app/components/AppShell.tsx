@@ -94,12 +94,20 @@ export function AppShell({
     <div className="mx-auto flex min-h-screen max-w-xl flex-col px-4 pb-24 pt-4">
       <div className="flex items-center justify-between">
         <div>
+          <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-textMuted">
+            FARMA CONTROL
+          </div>
           <div className="text-[18px] font-semibold text-textPrimary">
             {title}
           </div>
         </div>
 
         <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 rounded-btn border border-border/50 bg-surface2/70 px-3 py-2 text-[11px] text-textSecondary shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+            <div className={`h-2 w-2 rounded-full ${wsDot}`} />
+            <div>{wsText || '—'}</div>
+          </div>
+
           <Link
             href="/settings#notifications"
             className="flex h-11 w-11 items-center justify-center rounded-btn border border-border/70 bg-surface2 text-textSecondary transition active:scale-[0.98]"
@@ -107,16 +115,10 @@ export function AppShell({
           >
             <Bell size={18} />
           </Link>
-
-          <div className="text-right text-[11px] text-textSecondary">
-            <div className="flex items-center justify-end gap-2">
-              <div className={`h-2 w-2 rounded-full ${wsDot}`} />
-              <div>{wsText || '—'}</div>
-            </div>
-            <div className="text-textMuted">v={v || '-'}</div>
-          </div>
         </div>
       </div>
+
+      <div className="mt-2 text-[11px] text-textMuted">v={v || '-'}</div>
 
       <div className="mt-4 flex-1">{children}</div>
 

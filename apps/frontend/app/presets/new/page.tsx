@@ -197,7 +197,7 @@ export default function NewPresetPage() {
             </div>
             <div className="mt-2 grid gap-2">
               <select
-                className="w-full rounded-btn border border-border/70 bg-surface2 p-3 text-xs"
+                className="w-full rounded-btn border border-border/45 bg-surface2/55 p-3 text-xs text-textPrimary shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
                 value={sourcePrinterId}
                 onChange={(e) => {
                   setSourcePrinterId(e.target.value);
@@ -213,7 +213,7 @@ export default function NewPresetPage() {
               </select>
 
               <select
-                className="w-full rounded-btn border border-border/70 bg-surface2 p-3 text-xs"
+                className="w-full rounded-btn border border-border/45 bg-surface2/55 p-3 text-xs text-textPrimary shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
                 value={sourceFilename}
                 onChange={(e) => setSourceFilename(e.target.value)}
                 disabled={!sourcePrinterId}
@@ -241,7 +241,7 @@ export default function NewPresetPage() {
             <div className="text-xs font-medium text-textPrimary">Info</div>
             <div className="mt-2 grid gap-2">
               <input
-                className="w-full rounded-btn border border-border/70 bg-surface2 p-3 text-xs"
+                className="w-full rounded-btn border border-border/45 bg-surface2/55 p-3 text-xs text-textPrimary shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
                 placeholder="Title"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
@@ -253,7 +253,7 @@ export default function NewPresetPage() {
               )}
 
               <input
-                className="w-full rounded-btn border border-border/70 bg-surface2 p-3 text-xs"
+                className="w-full rounded-btn border border-border/45 bg-surface2/55 p-3 text-xs text-textPrimary shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
                 placeholder="Plastic type"
                 value={plasticType}
                 onChange={(e) => setPlasticType(e.target.value)}
@@ -266,13 +266,13 @@ export default function NewPresetPage() {
 
               <div className="flex gap-2">
                 <input
-                  className="flex-1 rounded-btn border border-border/70 bg-surface2 p-3 text-xs"
+                  className="flex-1 rounded-btn border border-border/45 bg-surface2/55 p-3 text-xs text-textPrimary shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
                   placeholder="#ffffff"
                   value={colorHex}
                   onChange={(e) => setColorHex(e.target.value)}
                 />
                 <input
-                  className="h-10 w-12 rounded-btn border border-border/70 bg-surface2"
+                  className="h-10 w-12 rounded-btn border border-border/45 bg-surface2/55 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
                   type="color"
                   value={colorHex}
                   onChange={(e) => setColorHex(e.target.value)}
@@ -285,7 +285,7 @@ export default function NewPresetPage() {
               )}
 
               <textarea
-                className="w-full rounded-btn border border-border/70 bg-surface2 p-3 text-xs"
+                className="w-full rounded-btn border border-border/45 bg-surface2/55 p-3 text-xs text-textPrimary shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
                 placeholder="Description (optional)"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
@@ -333,10 +333,10 @@ export default function NewPresetPage() {
                 <button
                   key={n}
                   className={
-                    'rounded-btn border border-border/70 px-3 py-2 text-xs ' +
+                    'rounded-btn border border-border/45 bg-surface2/55 px-3 py-2 text-xs shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] ' +
                     (allowedNozzleDiameters.includes(n)
-                      ? 'bg-accentCyan/10 text-accentCyan'
-                      : 'bg-surface2 text-textSecondary')
+                      ? 'border-accentCyan/35 bg-accentCyan/10 text-accentCyan'
+                      : 'text-textSecondary')
                   }
                   onClick={() => toggleNozzle(n)}
                   type="button"
@@ -348,7 +348,7 @@ export default function NewPresetPage() {
 
             <div className="mt-3 flex gap-2">
               <input
-                className="flex-1 rounded-btn border border-border/70 bg-surface2 p-3 text-xs"
+                className="flex-1 rounded-btn border border-border/45 bg-surface2/55 p-3 text-xs text-textPrimary shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
                 placeholder="custom nozzle (e.g. 0.5)"
                 value={customNozzle}
                 onChange={(e) => setCustomNozzle(e.target.value)}
@@ -368,14 +368,14 @@ export default function NewPresetPage() {
             <div className="mt-3 text-xs text-textSecondary">Min bed size</div>
             <div className="mt-2 grid grid-cols-2 gap-2">
               <input
-                className="w-full rounded-btn border border-border/70 bg-surface2 p-3 text-xs"
+                className="w-full rounded-btn border border-border/45 bg-surface2/55 p-3 text-xs text-textPrimary shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
                 placeholder="minBedX"
                 value={minBedX}
                 type="number"
                 onChange={(e) => setMinBedX(Number(e.target.value))}
               />
               <input
-                className="w-full rounded-btn border border-border/70 bg-surface2 p-3 text-xs"
+                className="w-full rounded-btn border border-border/45 bg-surface2/55 p-3 text-xs text-textPrimary shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
                 placeholder="minBedY"
                 value={minBedY}
                 type="number"
@@ -403,7 +403,8 @@ export default function NewPresetPage() {
           </div>
 
           <div className="text-xs text-textMuted">
-            Thumbnail & metadata may appear after first deploy.
+            Thumbnail & metadata are fetched from Moonraker immediately after
+            save.
           </div>
         </div>
       )}

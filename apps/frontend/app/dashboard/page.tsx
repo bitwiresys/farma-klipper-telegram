@@ -10,6 +10,7 @@ import { BottomSheet } from '../components/ui/BottomSheet';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { EmptyState } from '../components/ui/EmptyState';
+import { InsetStat } from '../components/ui/InsetStat';
 import { ProgressBar } from '../components/ui/ProgressBar';
 import { StatusPill } from '../components/ui/StatusPill';
 import { useAuth } from '../auth/auth_context';
@@ -179,27 +180,16 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
-                <div className="rounded-btn border border-border/70 bg-surface2 p-2">
-                  <div className="text-textMuted">ETA</div>
-                  <div className="text-textPrimary">
-                    {fmtEta(p.snapshot.etaSec)}
-                  </div>
-                </div>
-                <div className="rounded-btn border border-border/70 bg-surface2 p-2">
-                  <div className="text-textMuted">Temps</div>
-                  <div className="text-textPrimary">
-                    {p.snapshot.temps.extruder ?? '—'}/
-                    {p.snapshot.temps.bed ?? '—'}
-                  </div>
-                </div>
-                <div className="rounded-btn border border-border/70 bg-surface2 p-2">
-                  <div className="text-textMuted">Layers</div>
-                  <div className="text-textPrimary">
-                    {p.snapshot.layers.current ?? '—'}/
-                    {p.snapshot.layers.total ?? '—'}
-                  </div>
-                </div>
+              <div className="mt-3 grid grid-cols-3 gap-2">
+                <InsetStat label="ETA" value={fmtEta(p.snapshot.etaSec)} />
+                <InsetStat
+                  label="TEMPS"
+                  value={`${p.snapshot.temps.extruder ?? '—'}/${p.snapshot.temps.bed ?? '—'}`}
+                />
+                <InsetStat
+                  label="LAYERS"
+                  value={`${p.snapshot.layers.current ?? '—'}/${p.snapshot.layers.total ?? '—'}`}
+                />
               </div>
 
               {showActions && (

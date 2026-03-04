@@ -227,7 +227,7 @@ export default function SettingsPage() {
           </div>
 
           <div className="mt-3 space-y-2">
-            <div className="flex items-center justify-between rounded-btn border border-border/70 bg-surface2 p-3 text-xs">
+            <div className="flex items-center justify-between rounded-btn border border-border/45 bg-surface2/55 p-3 text-xs shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
               <div className="text-textPrimary">Notifications enabled</div>
               <Switch
                 checked={Boolean(notif?.notificationsEnabled)}
@@ -238,7 +238,7 @@ export default function SettingsPage() {
               />
             </div>
 
-            <div className="flex items-center justify-between rounded-btn border border-border/70 bg-surface2 p-3 text-xs">
+            <div className="flex items-center justify-between rounded-btn border border-border/45 bg-surface2/55 p-3 text-xs shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
               <div className="text-textPrimary">First layer done</div>
               <Switch
                 checked={Boolean(notif?.notifyFirstLayer)}
@@ -252,7 +252,7 @@ export default function SettingsPage() {
               />
             </div>
 
-            <div className="flex items-center justify-between rounded-btn border border-border/70 bg-surface2 p-3 text-xs">
+            <div className="flex items-center justify-between rounded-btn border border-border/45 bg-surface2/55 p-3 text-xs shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
               <div className="text-textPrimary">Print complete</div>
               <Switch
                 checked={Boolean(notif?.notifyComplete)}
@@ -266,7 +266,7 @@ export default function SettingsPage() {
               />
             </div>
 
-            <div className="flex items-center justify-between rounded-btn border border-border/70 bg-surface2 p-3 text-xs">
+            <div className="flex items-center justify-between rounded-btn border border-border/45 bg-surface2/55 p-3 text-xs shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
               <div className="text-textPrimary">Print error</div>
               <Switch
                 checked={Boolean(notif?.notifyError)}
@@ -300,7 +300,7 @@ export default function SettingsPage() {
         </div>
 
         <div className="mt-3 space-y-2">
-          <div className="rounded-btn border border-border/70 bg-surface2 p-3 text-xs">
+          <div className="rounded-btn border border-border/45 bg-surface2/55 p-3 text-xs shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
             <div className="text-textPrimary">You</div>
             <div className="mt-1 text-textSecondary">
               id: {sec?.user.telegramId ?? '—'}
@@ -310,7 +310,7 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          <div className="rounded-btn border border-border/70 bg-surface2 p-3 text-xs">
+          <div className="rounded-btn border border-border/45 bg-surface2/55 p-3 text-xs shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
             <div className="text-textPrimary">Allowed Telegram users</div>
 
             {sec?.allowedTelegramUserIds && (
@@ -386,20 +386,20 @@ export default function SettingsPage() {
         </div>
 
         <div className="mt-2 space-y-2 text-xs">
-          <div className="flex items-center justify-between rounded-btn border border-border/70 bg-surface2 p-3">
+          <div className="flex items-center justify-between rounded-btn border border-border/45 bg-surface2/55 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
             <div className="text-textSecondary">Version</div>
             <div className="font-mono text-textPrimary">
               {status?.version ?? '—'}
             </div>
           </div>
-          <div className="flex items-center justify-between rounded-btn border border-border/70 bg-surface2 p-3">
+          <div className="flex items-center justify-between rounded-btn border border-border/45 bg-surface2/55 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
             <div className="text-textSecondary">Uptime</div>
             <div className="font-mono text-textPrimary">
               {status ? fmtUptime(status.uptimeSec) : '—'}
             </div>
           </div>
 
-          <div className="flex items-center justify-between rounded-btn border border-border/70 bg-surface2 p-3">
+          <div className="flex items-center justify-between rounded-btn border border-border/45 bg-surface2/55 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
             <div className="text-textSecondary">Last updated</div>
             <div className="font-mono text-textPrimary">
               {statusUpdatedAt
@@ -407,7 +407,7 @@ export default function SettingsPage() {
                 : '—'}
             </div>
           </div>
-          <div className="flex items-center justify-between rounded-btn border border-border/70 bg-surface2 p-3">
+          <div className="flex items-center justify-between rounded-btn border border-border/45 bg-surface2/55 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
             <div className="text-textSecondary">WS</div>
             <div className="font-mono text-textPrimary">{wsStatus}</div>
           </div>
@@ -429,7 +429,7 @@ export default function SettingsPage() {
             </Button>
           </div>
 
-          <div className="rounded-btn border border-border/70 bg-surface2 p-3">
+          <div className="rounded-btn border border-border/45 bg-surface2/55 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
             <div className="text-textMuted">NEXT_PUBLIC_BACKEND_BASE_URL</div>
             <div className="mt-1 break-all font-mono text-textSecondary">
               {base || '—'}
@@ -454,7 +454,7 @@ export default function SettingsPage() {
             Enter Telegram numeric user id.
           </div>
           <input
-            className="w-full rounded-btn border border-border/70 bg-surface2 p-3 text-xs"
+            className="w-full rounded-btn border border-border/45 bg-surface2/55 p-3 text-xs text-textPrimary shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
             placeholder="123456789"
             value={newTelegramId}
             onChange={(e) => setNewTelegramId(e.target.value)}
@@ -488,7 +488,7 @@ export default function SettingsPage() {
           <div className="text-xs text-textSecondary">
             This user will lose access to the panel.
           </div>
-          <div className="rounded-btn border border-border/70 bg-surface2 p-3 text-xs">
+          <div className="rounded-btn border border-border/45 bg-surface2/55 p-3 text-xs shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
             <div className="text-textMuted">Telegram user id</div>
             <div className="mt-1 font-mono text-textPrimary">
               {removeTelegramId ?? '—'}

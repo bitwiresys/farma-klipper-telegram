@@ -10,6 +10,7 @@ import { BottomSheet } from '../../components/ui/BottomSheet';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Chip } from '../../components/ui/Chip';
+import { Switch } from '../../components/ui/Switch';
 import { useAuth } from '../../auth/auth_context';
 import { apiRequest, tryParseApiErrorBody, type ApiError } from '../../lib/api';
 import { useWs } from '../../ws/ws_context';
@@ -326,7 +327,7 @@ export default function PresetDetailPage() {
                 {results.map((r) => (
                   <div
                     key={r.printerId}
-                    className="rounded-card border border-border/70 bg-surface2 p-2 text-xs"
+                    className="rounded-card border border-border/45 bg-surface2/55 p-2 text-xs shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
                   >
                     <div className="flex items-start justify-between">
                       <div className="font-medium text-textPrimary">
@@ -355,22 +356,31 @@ export default function PresetDetailPage() {
             title="Select printers"
           >
             <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <label className="flex items-center gap-2 text-xs text-textSecondary">
-                  <input
-                    type="checkbox"
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-xs font-medium text-textPrimary">
+                    Select all compatible
+                  </div>
+                  <div className="mt-0.5 text-[11px] text-textMuted">
+                    Only printers without compatibility issues
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <button
+                    className="text-xs text-accentCyan"
+                    onClick={() => selectAllCompatible()}
+                    type="button"
+                    disabled={printing}
+                  >
+                    Fill
+                  </button>
+                  <Switch
                     checked={selectAll}
-                    onChange={(e) => setSelectAll(e.target.checked)}
+                    disabled={printing}
+                    onChange={(next) => setSelectAll(next)}
                   />
-                  Select all compatible
-                </label>
-                <button
-                  className="text-xs text-accentCyan"
-                  onClick={() => selectAllCompatible()}
-                  type="button"
-                >
-                  Fill
-                </button>
+                </div>
               </div>
 
               <div className="space-y-2">
@@ -428,21 +438,23 @@ export default function PresetDetailPage() {
                 )}
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
-                <Button
-                  variant="secondary"
-                  onClick={() => setSelectOpen(false)}
-                  disabled={printing}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  variant="primary"
-                  onClick={() => setConfirmOpen(true)}
-                  disabled={printing || selected.size === 0}
-                >
-                  Start on {selected.size}
-                </Button>
+              <div className="sticky bottom-0 -mx-4 border-t border-border/50 bg-surface1/80 px-4 pt-3 backdrop-blur">
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    variant="secondary"
+                    onClick={() => setSelectOpen(false)}
+                    disabled={printing}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="primary"
+                    onClick={() => setConfirmOpen(true)}
+                    disabled={printing || selected.size === 0}
+                  >
+                    Start on {selected.size}
+                  </Button>
+                </div>
               </div>
             </div>
           </BottomSheet>
@@ -464,7 +476,7 @@ export default function PresetDetailPage() {
                   .map((p) => (
                     <div
                       key={(p as PrinterDto).id}
-                      className="flex items-center justify-between rounded-card border border-border/70 bg-surface2 p-2 text-xs"
+                      className="flex items-center justify-between rounded-card border border-border/45 bg-surface2/55 p-2 text-xs shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
                     >
                       <div className="font-medium text-textPrimary">
                         {(p as PrinterDto).displayName}

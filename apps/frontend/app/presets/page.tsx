@@ -9,6 +9,7 @@ import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Chip } from '../components/ui/Chip';
 import { EmptyState } from '../components/ui/EmptyState';
+import { SearchInput } from '../components/ui/SearchInput';
 import { useAuth } from '../auth/auth_context';
 import { apiRequest } from '../lib/api';
 import { useWs } from '../ws/ws_context';
@@ -81,8 +82,7 @@ export default function PresetsPage() {
       {token && (
         <>
           <div className="mt-3">
-            <input
-              className="w-full rounded-btn border border-border/70 bg-surface2 p-3 text-xs text-textPrimary placeholder:text-textMuted"
+            <SearchInput
               placeholder="Search presets…"
               value={query}
               onChange={(e) => setQuery(e.target.value)}

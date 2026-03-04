@@ -47,6 +47,13 @@ function statusTone(status: PrintHistoryDto['status']): string {
   return 'text-accentAmber';
 }
 
+function statusBadge(status: PrintHistoryDto['status']): string {
+  if (status === 'completed') return 'border-success/25 bg-success/12';
+  if (status === 'error') return 'border-danger/25 bg-danger/12';
+  if (status === 'cancelled') return 'border-offlineGray/25 bg-offlineGray/12';
+  return 'border-warning/25 bg-warning/12';
+}
+
 export default function HistoryPage() {
   const { token } = useAuth();
   const ws = useWs();
@@ -180,7 +187,12 @@ export default function HistoryPage() {
               >
                 <Card className="p-3">
                   <div className="flex items-start gap-3">
-                    <div className={`mt-0.5 shrink-0 ${statusTone(h.status)}`}>
+                    <div
+                      className={
+                        `mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border ` +
+                        `${statusBadge(h.status)} ${statusTone(h.status)}`
+                      }
+                    >
                       {(() => {
                         const Ico = statusIcon(h.status);
                         return <Ico size={18} />;

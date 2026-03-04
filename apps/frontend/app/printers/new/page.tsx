@@ -111,7 +111,7 @@ export default function NewPrinterPage() {
             <div className="text-xs font-medium text-textPrimary">Info</div>
             <div className="mt-2 grid gap-2">
               <input
-                className="w-full rounded-btn border border-border/70 bg-surface2 p-3 text-xs"
+                className="w-full rounded-btn border border-border/45 bg-surface2/55 p-3 text-xs text-textPrimary shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
                 placeholder="Display name"
                 value={displayName}
                 onChange={(e) => {
@@ -120,7 +120,7 @@ export default function NewPrinterPage() {
               />
 
               <select
-                className="w-full rounded-btn border border-border/70 bg-surface2 p-3 text-xs"
+                className="w-full rounded-btn border border-border/45 bg-surface2/55 p-3 text-xs text-textPrimary shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
                 value={modelId}
                 onChange={(e) => setModelId(e.target.value)}
               >
@@ -134,7 +134,7 @@ export default function NewPrinterPage() {
 
               <div className="flex gap-2">
                 <input
-                  className="flex-1 rounded-btn border border-border/70 bg-surface2 p-3 text-xs"
+                  className="flex-1 rounded-btn border border-border/45 bg-surface2/55 p-3 text-xs text-textPrimary shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
                   placeholder="Create new model…"
                   value={newModelName}
                   onChange={(e) => setNewModelName(e.target.value)}
@@ -156,7 +156,7 @@ export default function NewPrinterPage() {
             </div>
             <div className="mt-2 grid gap-2">
               <input
-                className="w-full rounded-btn border border-border/70 bg-surface2 p-3 text-xs"
+                className="w-full rounded-btn border border-border/45 bg-surface2/55 p-3 text-xs text-textPrimary shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
                 placeholder="Moonraker URL (http://...:7125)"
                 value={moonrakerBaseUrl}
                 onChange={(e) => {
@@ -166,7 +166,7 @@ export default function NewPrinterPage() {
 
               <div className="flex gap-2">
                 <input
-                  className="flex-1 rounded-btn border border-border/70 bg-surface2 p-3 text-xs"
+                  className="flex-1 rounded-btn border border-border/45 bg-surface2/55 p-3 text-xs text-textPrimary shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
                   placeholder="API Key"
                   type={showKey ? 'text' : 'password'}
                   value={moonrakerApiKey}

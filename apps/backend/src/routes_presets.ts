@@ -181,10 +181,36 @@ export async function registerPresetsRoutes(app: FastifyInstance) {
     }
 
     const presetId = crypto.randomUUID();
-    const gcodeRef = encodeGcodeRef({
-      sourcePrinterId,
+    const sourcePrinter = await prisma.printer.findUnique({
+      where: { id: sourcePrinterId },
+    });
+    if (!sourcePrinter) {
+      return reply.code(400).send({
+        error: 'BAD_REQUEST',
+        message: 'sourcePrinterId not found',
+      });
+    }
+
+    const sourceApiKey = decryptApiKey(
+      sourcePrinter.apiKeyEncrypted,
+      env.PRINTER_API_KEY_ENC_KEY,
+    );
+
+    const sourceHttp = new MoonrakerHttp({
+      baseUrl: sourcePrinter.baseUrl,
+      apiKey: sourceApiKey,
+    });
+
+    // Download gcode immediately and store locally (project-owned)
+    const gcodeBytes = await sourceHttp.downloadFile({
+      root: 'gcodes',
       filename: sourceFilename,
     });
+    const checksum = sha256Hex(gcodeBytes);
+    const gcodeRel = path.posix.join('presets', presetId, `${checksum}.gcode`);
+    const gcodeAbs = resolveFilesDirSafe(gcodeRel);
+    ensureDir(path.dirname(gcodeAbs));
+    fs.writeFileSync(gcodeAbs, gcodeBytes);
 
     const created = await prisma.preset.create({
       data: {
@@ -193,7 +219,7 @@ export async function registerPresetsRoutes(app: FastifyInstance) {
         plasticType: parsed.data.plasticType,
         colorHex: parsed.data.colorHex,
         description: parsed.data.description ?? null,
-        gcodePath: gcodeRef,
+        gcodePath: gcodeRel,
         gcodeMeta: Prisma.DbNull,
         allowedModels: {
           create: parsed.data.compatibilityRules.allowedModelIds.map(
@@ -215,12 +241,31 @@ export async function registerPresetsRoutes(app: FastifyInstance) {
       },
     });
 
+    // Fetch metadata + thumbnail immediately (slicer preview already exists)
+    try {
+      await presetMetaService.ensureMetaAndThumbnail({
+        presetId: created.id,
+        printerId: sourcePrinterId,
+        remoteFilename: sourceFilename,
+        http: sourceHttp,
+      });
+    } catch {
+      // best-effort
+    }
+
+    const createdWithMeta = await prisma.preset.findUnique({
+      where: { id: created.id },
+      include: { allowedModels: true, compatibilityRules: true },
+    });
+
     wsHub.broadcast({
       type: 'PRESET_UPDATED',
       payload: { presetId: created.id },
     });
 
-    return reply.code(201).send({ preset: presetToDto(created) });
+    return reply
+      .code(201)
+      .send({ preset: presetToDto(createdWithMeta ?? created) });
   });
 
   app.post('/api/presets/:id/print', async (req, reply) => {
@@ -447,14 +492,20 @@ export async function registerPresetsRoutes(app: FastifyInstance) {
 
     await prisma.preset.delete({ where: { id } });
 
-    // best-effort: remove local files only for legacy upload-based presets
+    // best-effort: remove local files for locally stored presets (and legacy ones)
     try {
       if (!preset.gcodePath.startsWith(GCODE_REF_PREFIX)) {
         const abs = resolveFilesDirSafe(preset.gcodePath);
         if (fs.existsSync(abs)) fs.rmSync(abs, { force: true });
+
         const dir = path.dirname(abs);
         if (fs.existsSync(dir))
           fs.rmSync(dir, { recursive: true, force: true });
+      }
+
+      if (preset.thumbnailPath) {
+        const absThumb = resolveFilesDirSafe(preset.thumbnailPath);
+        if (fs.existsSync(absThumb)) fs.rmSync(absThumb, { force: true });
       }
     } catch {
       // ignore
