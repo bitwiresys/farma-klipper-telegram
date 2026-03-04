@@ -89,10 +89,10 @@ export async function registerSecurityRoutes(app: FastifyInstance) {
       create: {
         telegramId: String(idNum),
         isAllowed: true,
-        notificationsEnabled: false,
-        notifyFirstLayer: false,
-        notifyComplete: false,
-        notifyError: false,
+        notificationsEnabled: true,
+        notifyFirstLayer: true,
+        notifyComplete: true,
+        notifyError: true,
       },
       update: { isAllowed: true },
     });

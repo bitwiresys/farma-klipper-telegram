@@ -56,6 +56,7 @@ type PrinterMemo = {
   lastPrintState: string | null;
   gcode: GcodeLine[];
   lastDiagAtMs: number;
+  lastInfoAtMs: number;
 };
 
 function nowMs(): number {
@@ -144,6 +145,7 @@ export class NotificationService {
 
     const now = nowMs();
     const diagDue = now - m.lastDiagAtMs >= 30_000;
+    const infoDue = now - m.lastInfoAtMs >= 120_000;
 
     if (!printSessionId) {
       if (diagDue) {
@@ -155,6 +157,17 @@ export class NotificationService {
             filename: snapshot.filename,
           },
           'notifications: no printSessionId yet (skipping)',
+        );
+      }
+      if (infoDue) {
+        m.lastInfoAtMs = now;
+        logger.info(
+          {
+            printerId,
+            state: snapshot.state,
+            filename: snapshot.filename,
+          },
+          'notifications: skipping (no printSessionId)',
         );
       }
       m.lastLayer = snapshot.layers.current;
@@ -190,6 +203,16 @@ export class NotificationService {
           'notifications: no eligible users with chatId (skipping)',
         );
       }
+      if (infoDue) {
+        m.lastInfoAtMs = now;
+        logger.info(
+          {
+            printerId,
+            printSessionId,
+          },
+          'notifications: skipping (no eligible users)',
+        );
+      }
       m.lastLayer = layers.current;
       m.lastPrintState = psState;
       return;
@@ -211,6 +234,13 @@ export class NotificationService {
     })();
 
     if (shouldFirstLayer) {
+      logger.info(
+        {
+          printerId,
+          printSessionId,
+        },
+        'notifications: FIRST_LAYER_DONE triggered',
+      );
       await this.maybeSend({
         printerId,
         printSessionId,
@@ -232,6 +262,13 @@ export class NotificationService {
     const shouldComplete =
       psState === 'complete' && m.lastPrintState !== 'complete';
     if (shouldComplete) {
+      logger.info(
+        {
+          printerId,
+          printSessionId,
+        },
+        'notifications: PRINT_COMPLETE triggered',
+      );
       await this.maybeSend({
         printerId,
         printSessionId,
@@ -249,6 +286,13 @@ export class NotificationService {
     // PRINT_ERROR
     const shouldError = psState === 'error' && m.lastPrintState !== 'error';
     if (shouldError) {
+      logger.info(
+        {
+          printerId,
+          printSessionId,
+        },
+        'notifications: PRINT_ERROR triggered',
+      );
       const tail = this.getGcodeTail(printerId);
       await this.maybeSend({
         printerId,
@@ -317,6 +361,7 @@ export class NotificationService {
       lastPrintState: null,
       gcode: [],
       lastDiagAtMs: 0,
+      lastInfoAtMs: 0,
     };
     this.memo.set(printerId, created);
     return created;
