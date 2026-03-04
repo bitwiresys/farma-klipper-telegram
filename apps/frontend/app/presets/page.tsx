@@ -21,6 +21,18 @@ type PrinterModelRow = {
   name: string;
 };
 
+function textColorForBg(hex: string): string {
+  const h = String(hex ?? '').trim();
+  const m = h.match(/^#?([0-9a-f]{6})$/i);
+  if (!m) return '#e6e8ee';
+  const n = parseInt(m[1], 16);
+  const r = (n >> 16) & 255;
+  const g = (n >> 8) & 255;
+  const b = n & 255;
+  const lum = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+  return lum > 0.62 ? '#0b1220' : '#f8fafc';
+}
+
 function fmtNozzle(xs: number[]): string {
   if (xs.length === 0) return 'nozzle any';
   const sorted = [...xs].sort((a, b) => a - b);
@@ -136,14 +148,15 @@ export default function PresetsPage() {
                     </Link>
 
                     <div className="mt-1 flex items-center gap-2">
-                      <div className="inline-flex items-center rounded-full border border-border/45 bg-surface2/55 px-2 py-1 text-[10px] font-semibold tracking-[0.12em] text-textSecondary shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+                      <div
+                        className="inline-flex items-center rounded-full border border-border/45 px-2 py-1 text-[10px] font-semibold tracking-[0.12em] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
+                        style={{
+                          background: p.colorHex || '#ffffff',
+                          color: textColorForBg(p.colorHex || '#ffffff'),
+                        }}
+                      >
                         {p.plasticType}
                       </div>
-                      <div
-                        className="h-4 w-4 rounded-full border border-border/70"
-                        style={{ background: p.colorHex || '#ffffff' }}
-                        aria-label={p.colorHex}
-                      />
                     </div>
 
                     <div className="mt-2 flex flex-wrap gap-2">

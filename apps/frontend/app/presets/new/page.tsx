@@ -13,6 +13,9 @@ import type { PresetDto } from '../../lib/dto';
 
 type FieldErrors = Record<string, string[]>;
 
+const BASE_PLASTICS = ['PLA', 'PETG', 'ABS', 'ASA', 'TPU', 'PA', 'PC'] as const;
+const CUSTOM_PLASTICS_KEY = 'farma_custom_plastics_v1';
+
 function normalizeFieldErrors(raw: unknown): FieldErrors {
   const obj = raw as any;
   const fe = obj?.details?.fieldErrors;
@@ -37,6 +40,8 @@ export default function NewPresetPage() {
   const [sourceFilename, setSourceFilename] = useState<string>('');
   const [title, setTitle] = useState('');
   const [plasticType, setPlasticType] = useState('PLA');
+  const [customPlastics, setCustomPlastics] = useState<string[]>([]);
+  const [customPlasticDraft, setCustomPlasticDraft] = useState('');
   const [colorHex, setColorHex] = useState('#ffffff');
   const [description, setDescription] = useState<string>('');
 
@@ -86,6 +91,42 @@ export default function NewPresetPage() {
     void loadHistory();
     void loadPrinters();
   }, [token]);
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(CUSTOM_PLASTICS_KEY);
+      const xs = raw ? (JSON.parse(raw) as unknown) : [];
+      const list = Array.isArray(xs)
+        ? xs
+            .map((x) => String(x).trim())
+            .filter((x) => x.length > 0)
+            .slice(0, 50)
+        : [];
+      setCustomPlastics(list);
+    } catch {
+      setCustomPlastics([]);
+    }
+  }, []);
+
+  const plasticOptions = useMemo(() => {
+    const base = [...BASE_PLASTICS];
+    const extra = customPlastics.filter((x) => !base.includes(x as any));
+    return [...base, ...extra];
+  }, [customPlastics]);
+
+  const addCustomPlastic = () => {
+    const v = customPlasticDraft.trim();
+    if (!v) return;
+    const next = Array.from(new Set([v, ...customPlastics])).slice(0, 50);
+    setCustomPlastics(next);
+    setPlasticType(v);
+    setCustomPlasticDraft('');
+    try {
+      window.localStorage.setItem(CUSTOM_PLASTICS_KEY, JSON.stringify(next));
+    } catch {
+      // ignore
+    }
+  };
 
   const toggleModel = (id: string) => {
     setAllowedModelIds((prev) =>
@@ -225,11 +266,34 @@ export default function NewPresetPage() {
               )}
 
               <input
+                className="hidden"
+                aria-hidden="true"
+                tabIndex={-1}
+                value=""
+                readOnly
+              />
+              <select
                 className="w-full rounded-btn border border-border/45 bg-surface2/55 p-3 text-xs text-textPrimary shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
-                placeholder="Plastic type"
                 value={plasticType}
                 onChange={(e) => setPlasticType(e.target.value)}
-              />
+              >
+                {plasticOptions.map((x) => (
+                  <option key={x} value={x}>
+                    {x}
+                  </option>
+                ))}
+              </select>
+              <div className="flex gap-2">
+                <input
+                  className="flex-1 rounded-btn border border-border/45 bg-surface2/55 p-3 text-xs text-textPrimary shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
+                  placeholder="Add custom plastic"
+                  value={customPlasticDraft}
+                  onChange={(e) => setCustomPlasticDraft(e.target.value)}
+                />
+                <Button variant="secondary" onClick={() => addCustomPlastic()}>
+                  Add
+                </Button>
+              </div>
               {fieldErrors.plasticType && (
                 <div className="text-xs text-red-400">
                   {fieldErrors.plasticType.join(', ')}

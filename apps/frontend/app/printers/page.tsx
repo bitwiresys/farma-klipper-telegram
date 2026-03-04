@@ -113,11 +113,17 @@ export default function PrintersPage() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="truncate text-[14px] font-semibold text-textPrimary">
-                        {filename ?? p.displayName}
-                      </div>
-                      <div className="mt-1 text-xs text-textSecondary">
                         {p.displayName}
                       </div>
+                      <div className="mt-1 text-xs text-textSecondary">
+                        {p.modelName}
+                      </div>
+                      {(state === 'printing' || state === 'paused') &&
+                        filename && (
+                          <div className="mt-1 truncate text-[11px] text-textMuted">
+                            {filename}
+                          </div>
+                        )}
                     </div>
                     <StatusPill state={state} />
                   </div>
