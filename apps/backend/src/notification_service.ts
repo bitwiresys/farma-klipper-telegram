@@ -172,8 +172,8 @@ export class NotificationService {
       if (layersHave) {
         return (
           layers.current !== null &&
-          layers.current >= 2 &&
-          (m.lastLayer === null || m.lastLayer < 2)
+          layers.current >= 1 &&
+          (m.lastLayer === null || m.lastLayer < 1)
         );
       }
       if (progress === null || printDurationSec === null) return false;

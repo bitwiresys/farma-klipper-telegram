@@ -2,16 +2,22 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import type { ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import {
   Bell,
   Clock,
   FolderOpen,
   LayoutGrid,
+  OctagonX,
   Printer,
   Settings,
 } from 'lucide-react';
+
+import type { PrinterDto } from '../lib/dto';
+import { apiRequest, type ApiError } from '../lib/api';
+import { useAuth } from '../auth/auth_context';
+import { useWs } from '../ws/ws_context';
 
 type TabKey = 'dashboard' | 'presets' | 'printers' | 'history' | 'settings';
 
@@ -73,6 +79,74 @@ export function AppShell({
 }) {
   const pathname = usePathname();
   const { title, tab } = titleFromPath(pathname);
+  const { token } = useAuth();
+  const ws = useWs();
+
+  const [printers, setPrinters] = useState<PrinterDto[]>([]);
+  const [actionErr, setActionErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!token) return;
+    let alive = true;
+    void (async () => {
+      try {
+        const res = await apiRequest<{ printers: PrinterDto[] }>(
+          '/api/snapshot',
+          {
+            token,
+          },
+        );
+        if (!alive) return;
+        setPrinters(res.printers ?? []);
+      } catch {
+        // ignore
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [token]);
+
+  useEffect(() => {
+    if (!token) return;
+    return ws.subscribe((ev) => {
+      const e = ev as any;
+      if (e?.type !== 'PRINTER_STATUS') return;
+      const p = e.payload?.printer as PrinterDto | undefined;
+      if (!p) return;
+      setPrinters((prev) => {
+        const idx = prev.findIndex((x) => x.id === p.id);
+        if (idx === -1) return [p, ...prev];
+        const copy = [...prev];
+        copy[idx] = p;
+        return copy;
+      });
+    });
+  }, [token, ws]);
+
+  const activePrinter = useMemo(() => {
+    return (
+      printers.find(
+        (p) =>
+          p.snapshot?.state === 'printing' || p.snapshot?.state === 'paused',
+      ) ?? null
+    );
+  }, [printers]);
+
+  const doEstop = async () => {
+    if (!token) return;
+    if (!activePrinter) return;
+    setActionErr(null);
+    try {
+      await apiRequest(`/api/printers/${activePrinter.id}/emergency_stop`, {
+        token,
+        method: 'POST',
+      });
+    } catch (e) {
+      const ae = e as ApiError;
+      setActionErr(ae.bodyText ?? String(e));
+    }
+  };
 
   const wsText =
     wsStatus === 'open'
@@ -113,6 +187,18 @@ export function AppShell({
               <div>{wsText || '—'}</div>
             </div>
 
+            {activePrinter && (
+              <button
+                type="button"
+                onClick={() => void doEstop()}
+                className="flex h-11 w-11 items-center justify-center rounded-btn border border-danger/50 bg-surface2 text-danger transition active:scale-[0.98]"
+                aria-label="Emergency stop"
+                title="Emergency stop"
+              >
+                <OctagonX size={18} />
+              </button>
+            )}
+
             <Link
               href="/settings#notifications"
               className="flex h-11 w-11 items-center justify-center rounded-btn border border-border/70 bg-surface2 text-textSecondary transition active:scale-[0.98]"
@@ -122,6 +208,12 @@ export function AppShell({
             </Link>
           </div>
         </div>
+
+        {actionErr && (
+          <div className="mt-2 break-all text-[11px] text-danger">
+            {actionErr}
+          </div>
+        )}
       </div>
 
       <div className="mt-4 flex-1">{children}</div>

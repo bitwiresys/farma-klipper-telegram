@@ -182,9 +182,18 @@ function computeSnapshotFromStatus(raw: RawStatus): {
   };
 
   const layers = {
-    current: numOrNull((ps as any)?.info?.current_layer) ?? null,
-    total: numOrNull((ps as any)?.info?.total_layer) ?? null,
+    current: null as number | null,
+    total: null as number | null,
   };
+
+  if (state === PrinterState.printing || state === PrinterState.paused) {
+    const c = numOrNull((ps as any)?.info?.current_layer);
+    const t = numOrNull((ps as any)?.info?.total_layer);
+    if (c !== null && t !== null && t > 1 && c >= 0 && c <= t) {
+      layers.current = c;
+      layers.total = t;
+    }
+  }
 
   const commanded = {
     x: arrNumAtOrNull(th.position, 0),
@@ -656,11 +665,16 @@ export class PrinterRuntimeManager {
             nextLayers &&
             nextLayers.total === null &&
             nextLayers.current === null &&
-            meta?.filename === activeFilename
+            meta?.filename === activeFilename &&
+            snapshot.progress !== null &&
+            snapshot.progress > 0
           ) {
             const mh = meta.meta.layerHeight;
             const oh = meta.meta.objectHeight;
-            const z = snapshot.position?.commanded?.z ?? null;
+            const z =
+              snapshot.position?.gcode?.z ??
+              snapshot.position?.commanded?.z ??
+              null;
             if (mh !== null && oh !== null && mh > 0) {
               const total = Math.max(1, Math.ceil(oh / mh));
               const current =

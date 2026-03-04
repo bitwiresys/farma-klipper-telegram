@@ -67,15 +67,21 @@ export async function apiRequest<T>(
     headers.Authorization = `Bearer ${opts.token}`;
   }
 
+  const method = (opts.method ?? 'GET').toUpperCase();
+  const wantsJsonBody =
+    method === 'POST' ||
+    method === 'PUT' ||
+    method === 'PATCH' ||
+    method === 'DELETE';
   const hasBody = opts.body !== undefined;
-  if (hasBody) {
-    headers['Content-Type'] = 'application/json';
-  }
+  const bodyObj = hasBody ? opts.body : wantsJsonBody ? {} : undefined;
+  const willSendBody = bodyObj !== undefined;
+  if (willSendBody) headers['Content-Type'] = 'application/json';
 
   const res = await fetch(url, {
     method: opts.method ?? 'GET',
     headers,
-    body: hasBody ? JSON.stringify(opts.body) : undefined,
+    body: willSendBody ? JSON.stringify(bodyObj) : undefined,
     cache: 'no-store',
   });
 
