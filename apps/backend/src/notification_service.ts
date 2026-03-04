@@ -1,6 +1,7 @@
 import { NotificationEventType, PrinterState } from '@farma/shared';
 
 import { prisma } from './prisma.js';
+import { logger } from './logger.js';
 
 export type NotificationSender = {
   sendMessage: (chatId: string, text: string) => Promise<void>;
@@ -54,6 +55,7 @@ type PrinterMemo = {
   lastLayer: number | null;
   lastPrintState: string | null;
   gcode: GcodeLine[];
+  lastDiagAtMs: number;
 };
 
 function nowMs(): number {
@@ -73,7 +75,11 @@ function strOrNull(x: unknown): string | null {
 function normalizePrintStatsState(raw: unknown): string | null {
   const s = strOrNull(raw);
   if (!s) return null;
-  return s.trim().toLowerCase();
+  const n = s.trim().toLowerCase();
+  if (n === 'completed') return 'complete';
+  if (n === 'cancelled') return 'cancelled';
+  if (n === 'canceled') return 'cancelled';
+  return n;
 }
 
 function clamp01(x: number): number {
@@ -136,7 +142,21 @@ export class NotificationService {
       state: snapshot.state,
     });
 
+    const now = nowMs();
+    const diagDue = now - m.lastDiagAtMs >= 30_000;
+
     if (!printSessionId) {
+      if (diagDue) {
+        m.lastDiagAtMs = now;
+        logger.debug(
+          {
+            printerId,
+            state: snapshot.state,
+            filename: snapshot.filename,
+          },
+          'notifications: no printSessionId yet (skipping)',
+        );
+      }
       m.lastLayer = snapshot.layers.current;
       m.lastPrintState = normalizePrintStatsState(
         (rawStatus.print_stats as any)?.state,
@@ -160,6 +180,16 @@ export class NotificationService {
 
     const canNotify = await this.listUsers();
     if (canNotify.length === 0) {
+      if (diagDue) {
+        m.lastDiagAtMs = now;
+        logger.debug(
+          {
+            printerId,
+            printSessionId,
+          },
+          'notifications: no eligible users with chatId (skipping)',
+        );
+      }
       m.lastLayer = layers.current;
       m.lastPrintState = psState;
       return;
@@ -236,6 +266,37 @@ export class NotificationService {
       });
     }
 
+    if (diagDue) {
+      m.lastDiagAtMs = now;
+      logger.debug(
+        {
+          printerId,
+          printSessionId,
+          psState,
+          snapshotState: snapshot.state,
+          progress,
+          printDurationSec,
+          layers,
+          shouldFirstLayer,
+          shouldComplete,
+          shouldError,
+          notifyUsers: {
+            total: canNotify.length,
+            firstLayer: canNotify.filter(
+              (u) => u.notificationsEnabled && u.notifyFirstLayer,
+            ).length,
+            complete: canNotify.filter(
+              (u) => u.notificationsEnabled && u.notifyComplete,
+            ).length,
+            error: canNotify.filter(
+              (u) => u.notificationsEnabled && u.notifyError,
+            ).length,
+          },
+        },
+        'notifications: evaluated',
+      );
+    }
+
     m.lastLayer = layers.current;
     m.lastPrintState = psState;
 
@@ -255,6 +316,7 @@ export class NotificationService {
       lastLayer: null,
       lastPrintState: null,
       gcode: [],
+      lastDiagAtMs: 0,
     };
     this.memo.set(printerId, created);
     return created;
@@ -284,7 +346,22 @@ export class NotificationService {
     if (!ok) return;
 
     await Promise.all(
-      input.users.map((u) => this.sender.sendMessage(u.chatId, input.text)),
+      input.users.map(async (u) => {
+        try {
+          await this.sender.sendMessage(u.chatId, input.text);
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          logger.warn(
+            {
+              printerId: input.printerId,
+              eventType: input.eventType,
+              chatId: u.chatId,
+              err: msg,
+            },
+            'telegram send failed',
+          );
+        }
+      }),
     );
   }
 
