@@ -11,7 +11,16 @@ function sanitizeGCode(input: string): string {
   // Avoid `split()` on large files (embedded thumbnails can be huge and cause OOM in webviews).
   // Process input line-by-line with minimal allocations.
   const maxLineLen = 8_192;
-  const allowedCmds = new Set(['G0', 'G1', 'G90', 'G91', 'G92', 'M82', 'M83']);
+  const allowedCmds = new Set([
+    'G0',
+    'G1',
+    'G21',
+    'G90',
+    'G91',
+    'G92',
+    'M82',
+    'M83',
+  ]);
   const allowedParams = new Set(['X', 'Y', 'Z', 'E', 'F']);
 
   let i = 0;
@@ -83,6 +92,7 @@ function sanitizeGCode(input: string): string {
     const cmd = parts[0].toUpperCase();
     const cleaned: string[] = [cmd];
     let keptParams = 0;
+    let hasXyz = false;
     for (let k = 1; k < parts.length; k++) {
       const p = parts[k];
       if (!p) continue;
@@ -95,6 +105,7 @@ function sanitizeGCode(input: string): string {
       if (!Number.isFinite(v)) continue;
       cleaned.push(`${key}${m[2]}`);
       keptParams++;
+      if (key === 'X' || key === 'Y' || key === 'Z') hasXyz = true;
     }
 
     // Drop empty motion commands (can confuse some parsers)
@@ -102,6 +113,13 @@ function sanitizeGCode(input: string): string {
       (cmdKey === 'G0' || cmdKey === 'G1' || cmdKey === 'G92') &&
       keptParams === 0
     ) {
+      i = j + 1;
+      continue;
+    }
+
+    // Prevent NaN geometry in three.js: G0/G1 moves without any XYZ coordinates
+    // (e.g. speed-only `G1 F...` or extrusion-only `G1 E...`) can create invalid segments.
+    if ((cmdKey === 'G0' || cmdKey === 'G1') && !hasXyz) {
       i = j + 1;
       continue;
     }
