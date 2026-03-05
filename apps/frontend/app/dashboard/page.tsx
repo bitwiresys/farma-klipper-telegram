@@ -15,6 +15,7 @@ import { EmptyState } from '../components/ui/EmptyState';
 import { InsetStat } from '../components/ui/InsetStat';
 import { ProgressBar } from '../components/ui/ProgressBar';
 import { StatusPill } from '../components/ui/StatusPill';
+import { GCodeThumbnail } from '../components/GCodeViewer';
 import { useAuth } from '../auth/auth_context';
 import { apiRequest, type ApiError } from '../lib/api';
 import { useWs } from '../ws/ws_context';
@@ -326,6 +327,20 @@ export default function DashboardPage() {
                   <StatusPill state={st} />
                 </div>
               </div>
+
+              {/* G-code thumbnail + progress */}
+              {(st === 'printing' || st === 'paused') && p.snapshot.filename && (
+                <Link
+                  href={`/printers/${p.id}/3d?filename=${encodeURIComponent(p.snapshot.filename)}`}
+                  className="mt-3 block"
+                >
+                  <GCodeThumbnail
+                    printerId={p.id}
+                    filename={p.snapshot.filename}
+                    className="h-[80px] w-full object-cover"
+                  />
+                </Link>
+              )}
 
               <div className="mt-3">
                 <ProgressBar value01={p.snapshot.progress} />

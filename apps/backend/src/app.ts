@@ -22,6 +22,7 @@ import { registerSecurityRoutes } from './routes_security.js';
 import { registerPushRoutes } from './routes_push.js';
 import { registerAnalyticsRoutes } from './routes_analytics.js';
 import { registerWebhookRoutes } from './routes_webhooks.js';
+import { registerGcodeRoutes } from './routes_gcode.js';
 import { registerWsHub } from './ws_hub.js';
 
 export async function buildApp() {
@@ -78,6 +79,7 @@ export async function buildApp() {
   await registerPushRoutes(app);
   await registerAnalyticsRoutes(app);
   await registerWebhookRoutes(app);
+  await registerGcodeRoutes(app);
   await registerWsHub(app);
 
   return app;
