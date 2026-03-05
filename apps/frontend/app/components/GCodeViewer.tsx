@@ -12,20 +12,24 @@ type GCodeViewerProps = {
   showNozzle?: boolean;
   showProgress?: boolean;
   progress?: number; // 0-100
+  currentLayer?: number | null;
+  totalLayers?: number | null;
   className?: string;
   lowPoly?: boolean; // For mobile optimization
 };
 
 // Simple G-code parser for basic visualization
-function parseGCode(gcode: string, lowPoly: boolean): { positions: Float32Array; colors: Float32Array; layerZ: number[] } {
+function parseGCode(gcode: string, lowPoly: boolean): { positions: Float32Array; colors: Float32Array; layerZ: number[]; layerPositions: Map<number, { start: number; end: number }> } {
   const positions: number[] = [];
   const colors: number[] = [];
   const layerZ: number[] = [];
+  const layerPositions = new Map<number, { start: number; end: number }>();
 
   let x = 0, y = 0, z = 0;
   let prevZ = 0;
-  let isExtruding = false;
+  let prevE = 0; // Track absolute E position
   let currentLayer = 0;
+  let vertexCount = 0;
 
   const lines = gcode.split('\n');
 
@@ -38,7 +42,7 @@ function parseGCode(gcode: string, lowPoly: boolean): { positions: Float32Array;
 
     if (cmd === 'G0' || cmd === 'G1') {
       let newX = x, newY = y, newZ = z;
-      let eVal = 0;
+      let eVal: number | null = null;
       let isMove = false;
 
       for (const part of parts.slice(1)) {
@@ -54,17 +58,33 @@ function parseGCode(gcode: string, lowPoly: boolean): { positions: Float32Array;
 
       // Detect layer change
       if (newZ !== prevZ && newZ > prevZ) {
+        // Record end of previous layer
+        if (layerPositions.has(currentLayer)) {
+          const lp = layerPositions.get(currentLayer)!;
+          lp.end = vertexCount;
+        }
+        
         layerZ.push(newZ);
         prevZ = newZ;
         currentLayer++;
+        
+        // Record start of new layer
+        layerPositions.set(currentLayer, { start: vertexCount, end: vertexCount });
       }
 
-      // Draw line if extruding (E increased)
-      const extruding = eVal > 0;
+      // Draw line if extruding (E changed)
+      const extruding = eVal !== null && eVal > prevE;
+      if (eVal !== null) prevE = eVal;
 
       if (extruding && isMove) {
+        // Record layer start if first vertex
+        if (!layerPositions.has(currentLayer)) {
+          layerPositions.set(currentLayer, { start: vertexCount, end: vertexCount });
+        }
+        
         // Add line vertices
         positions.push(x, y, z, newX, newY, newZ);
+        vertexCount += 2;
 
         // Color based on Z (gradient from bottom to top)
         const t = currentLayer / Math.max(currentLayer + 1, 10);
@@ -73,6 +93,10 @@ function parseGCode(gcode: string, lowPoly: boolean): { positions: Float32Array;
         const b = 0.8 - t * 0.3;
 
         colors.push(r, g, b, r, g, b);
+        
+        // Update layer end
+        const lp = layerPositions.get(currentLayer);
+        if (lp) lp.end = vertexCount;
       }
 
       x = newX;
@@ -85,6 +109,7 @@ function parseGCode(gcode: string, lowPoly: boolean): { positions: Float32Array;
     positions: new Float32Array(positions),
     colors: new Float32Array(colors),
     layerZ,
+    layerPositions,
   };
 }
 
@@ -96,6 +121,8 @@ export function GCodeViewer({
   showNozzle = true,
   showProgress = true,
   progress = 0,
+  currentLayer,
+  totalLayers,
   className = '',
   lowPoly = false,
 }: GCodeViewerProps) {
@@ -106,6 +133,8 @@ export function GCodeViewer({
   const controlsRef = useRef<OrbitControls | null>(null);
   const nozzleRef = useRef<THREE.Mesh | null>(null);
   const animationRef = useRef<number>(0);
+  const linesRef = useRef<THREE.LineSegments | null>(null);
+  const layerZRef = useRef<number[]>([]);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -228,10 +257,16 @@ export function GCodeViewer({
         }
 
         const gcode = await res.text();
-        const { positions, colors, layerZ } = parseGCode(gcode, lowPoly);
+        const { positions, colors, layerZ, layerPositions } = parseGCode(gcode, lowPoly);
 
         if (positions.length === 0) {
           throw new Error('No valid G-code data found');
+        }
+
+        // Remove old lines if any
+        if (linesRef.current) {
+          sceneRef.current?.remove(linesRef.current);
+          linesRef.current.geometry.dispose();
         }
 
         // Create geometry for G-code paths
@@ -242,10 +277,14 @@ export function GCodeViewer({
         const material = new THREE.LineBasicMaterial({
           vertexColors: true,
           linewidth: 1,
+          transparent: true,
+          opacity: 1,
         });
 
         const lines = new THREE.LineSegments(geometry, material);
         sceneRef.current?.add(lines);
+        linesRef.current = lines;
+        layerZRef.current = layerZ;
 
         // Center camera on model
         geometry.computeBoundingBox();
@@ -267,6 +306,50 @@ export function GCodeViewer({
 
     loadGCode();
   }, [printerId, filename, lowPoly, token]);
+
+  // Update layer visibility based on progress
+  useEffect(() => {
+    if (!linesRef.current || !layerZRef.current.length) return;
+    
+    const totalLayerCount = totalLayers ?? layerZRef.current.length;
+    const currentLayerNum = currentLayer ?? Math.floor((progress / 100) * totalLayerCount);
+    
+    // Update line opacity based on layer progress
+    const geometry = linesRef.current.geometry;
+    const positionAttr = geometry.getAttribute('position');
+    const colorAttr = geometry.getAttribute('color');
+    
+    if (!positionAttr || !colorAttr) return;
+    
+    // Find Z threshold for current layer
+    const zThreshold = layerZRef.current[Math.min(currentLayerNum, layerZRef.current.length - 1)] ?? Infinity;
+    
+    // Update colors: printed layers solid, future layers transparent
+    const colors = colorAttr.array as Float32Array;
+    const positions = positionAttr.array as Float32Array;
+    
+    for (let i = 0; i < positions.length; i += 6) {
+      const z1 = positions[i + 2];
+      const z2 = positions[i + 5];
+      const avgZ = (z1 + z2) / 2;
+      
+      const isPrinted = avgZ <= zThreshold;
+      const alpha = isPrinted ? 1.0 : 0.3;
+      
+      // Store alpha in 4th component if we had it, but LineBasicMaterial doesn't support per-vertex alpha
+      // So we dim the color instead
+      const dimFactor = isPrinted ? 1.0 : 0.4;
+      const baseIdx = (i / 3) * 3;
+      colors[baseIdx] = colors[baseIdx] * dimFactor;
+      colors[baseIdx + 1] = colors[baseIdx + 1] * dimFactor;
+      colors[baseIdx + 2] = colors[baseIdx + 2] * dimFactor;
+      colors[baseIdx + 3] = colors[baseIdx + 3] * dimFactor;
+      colors[baseIdx + 4] = colors[baseIdx + 4] * dimFactor;
+      colors[baseIdx + 5] = colors[baseIdx + 5] * dimFactor;
+    }
+    
+    colorAttr.needsUpdate = true;
+  }, [progress, currentLayer, totalLayers]);
 
   // Update nozzle position from toolhead
   useEffect(() => {
@@ -292,13 +375,32 @@ export function GCodeViewer({
         </div>
       )}
 
-      {showProgress && progress > 0 && (
-        <div className="absolute bottom-2 left-2 right-2">
-          <div className="h-1 rounded-full bg-surface2">
-            <div
-              className="h-full rounded-full bg-accentCyan"
-              style={{ width: `${progress}%` }}
-            />
+      {/* Vertical layer progress bar (like slicers) */}
+      {showProgress && layerZRef.current.length > 0 && (
+        <div className="absolute right-2 top-2 bottom-10 w-4 flex flex-col justify-end overflow-hidden rounded bg-surface2/80">
+          <div
+            className="w-full bg-accentCyan/60 transition-all"
+            style={{
+              height: `${((currentLayer ?? Math.floor((progress / 100) * (totalLayers ?? layerZRef.current.length))) / (totalLayers ?? layerZRef.current.length)) * 100}%`,
+            }}
+          />
+          <div className="absolute bottom-1 left-0 right-0 text-center text-[9px] text-textMuted">
+            {currentLayer ?? Math.floor((progress / 100) * (totalLayers ?? layerZRef.current.length))}/{totalLayers ?? layerZRef.current.length}
+          </div>
+        </div>
+      )}
+
+      {/* Horizontal overall progress bar */}
+      {showProgress && (
+        <div className="absolute bottom-2 left-2 right-8">
+          <div className="flex items-center gap-2">
+            <div className="flex-1 h-1.5 rounded-full bg-surface2">
+              <div
+                className="h-full rounded-full bg-accentCyan transition-all"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+            <span className="text-[10px] text-textMuted w-8 text-right">{progress.toFixed(0)}%</span>
           </div>
         </div>
       )}

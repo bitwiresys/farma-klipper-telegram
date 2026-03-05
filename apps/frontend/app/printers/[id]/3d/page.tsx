@@ -103,6 +103,8 @@ function GCode3DPageContent({ printerId }: { printerId: string }) {
 
   const progress = printer?.snapshot.progress ?? 0;
   const state = printer?.snapshot.state ?? 'standby';
+  const currentLayer = printer?.snapshot.layers.current ?? null;
+  const totalLayers = printer?.snapshot.layers.total ?? null;
 
   return (
     <div className="flex h-full flex-col">
@@ -155,6 +157,8 @@ function GCode3DPageContent({ printerId }: { printerId: string }) {
             showNozzle={true}
             showProgress={true}
             progress={progress * 100}
+            currentLayer={currentLayer}
+            totalLayers={totalLayers}
             lowPoly={true}
             className="h-full w-full"
           />
