@@ -47,7 +47,7 @@ function GCode3DPageContent({ printerId }: { printerId: string }) {
 
     const fetchPrinter = async () => {
       try {
-        const p = await apiRequest<PrinterDto>(`/api/printers/${printerId}`);
+        const p = await apiRequest<PrinterDto>(`/api/printers/${printerId}`, { token });
         setPrinter(p);
       } catch {
         // Ignore
