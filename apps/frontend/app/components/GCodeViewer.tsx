@@ -153,6 +153,7 @@ export function GCodeViewer({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [layerCount, setLayerCount] = useState(0);
+  const [segmentCount, setSegmentCount] = useState(0);
   
   // Simulation state
   const [simLayer, setSimLayer] = useState(0);
@@ -312,6 +313,7 @@ export function GCodeViewer({
         originalColorsRef.current = new Float32Array(colors);
         layerDataRef.current = layerData;
         setLayerCount(layerData.length);
+        setSegmentCount(Math.floor(positions.length / 6));
 
         // Center camera on model + fit to bounds
         geometry.computeBoundingBox();
@@ -383,12 +385,14 @@ export function GCodeViewer({
     }
 
     // Apply dimming to future layers
+    // NOTE: geometry positions are already mapped into Three.js coords
+    // so "height" is Y (index + 1), and should be compared with layer Z.
     for (let i = 0; i < positions.length; i += 6) {
-      const z1 = positions[i + 2];
-      const z2 = positions[i + 5];
-      const avgZ = (z1 + z2) / 2;
+      const y1 = positions[i + 1];
+      const y2 = positions[i + 4];
+      const avgY = (y1 + y2) / 2;
       
-      const isPrinted = avgZ <= zThreshold + 0.01;
+      const isPrinted = avgY <= zThreshold + 0.01;
       
       if (!isPrinted) {
         // Dim future layers
@@ -419,6 +423,10 @@ export function GCodeViewer({
   return (
     <div className={`relative ${className}`}>
       <div ref={containerRef} className="h-full w-full" />
+
+      <div className="absolute left-2 top-2 rounded bg-black/40 px-2 py-1 text-[10px] text-textMuted">
+        seg:{segmentCount} layers:{layerCount}
+      </div>
 
       {loading && (
         <div className="absolute inset-0 flex items-center justify-center bg-bg/80">
