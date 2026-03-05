@@ -4,6 +4,7 @@ const schema = z.object({
   NODE_ENV: z.enum(['development', 'production']).default('development'),
   PORT: z.coerce.number().int().positive().default(3001),
   BASE_URL_PUBLIC: z.string().url().default('http://localhost:3001'),
+  BACKEND_URL: z.string().url().optional(),
 
   JWT_SECRET: z.string().min(16),
 
@@ -21,6 +22,10 @@ const schema = z.object({
 
   RATE_LIMIT_RPM: z.coerce.number().int().positive().default(120),
   CORS_ORIGIN: z.string().default('*'),
+
+  // Web Push VAPID keys (generate with: npx web-push generate-vapid-keys)
+  VAPID_PUBLIC_KEY: z.string().optional(),
+  VAPID_PRIVATE_KEY: z.string().optional(),
 });
 
 export type Env = z.infer<typeof schema>;

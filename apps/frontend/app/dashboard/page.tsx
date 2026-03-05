@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 
-import { OctagonX } from 'lucide-react';
+import { OctagonX, LayoutGrid, List, Pause, Play, XCircle } from 'lucide-react';
 
 import type { PrinterDto, PrintHistoryDto } from '../lib/dto';
 
@@ -74,9 +74,32 @@ export default function DashboardPage() {
     filename: string;
   }>({ open: false, printerId: '', printerName: '', filename: '' });
 
+  const [viewMode, setViewMode] = useState<'cards' | 'compact'>('cards');
+  const [groupActionConfirm, setGroupActionConfirm] = useState<{
+    open: boolean;
+    action: 'pause' | 'resume' | 'cancel';
+    count: number;
+  }>({ open: false, action: 'pause', count: 0 });
+
   const printerLabelById = useMemo(() => {
     return buildPrinterLabelById(printers);
   }, [printers]);
+
+  // Group action helpers
+  const printingPrinters = useMemo(() => 
+    printers.filter(p => p.snapshot.state === 'printing'), 
+    [printers]
+  );
+  
+  const pausedPrinters = useMemo(() => 
+    printers.filter(p => p.snapshot.state === 'paused'), 
+    [printers]
+  );
+  
+  const activePrinters = useMemo(() => 
+    printers.filter(p => p.snapshot.state === 'printing' || p.snapshot.state === 'paused'),
+    [printers]
+  );
 
   const pause = async (printerId: string) => {
     if (!token) return;
@@ -148,6 +171,31 @@ export default function DashboardPage() {
     }
   };
 
+  // Group actions
+  const groupPause = async () => {
+    if (!token) return;
+    setErr(null);
+    await Promise.all(printingPrinters.map(p => 
+      apiRequest(`/api/printers/${p.id}/pause`, { token, method: 'POST' }).catch(() => {})
+    ));
+  };
+
+  const groupResume = async () => {
+    if (!token) return;
+    setErr(null);
+    await Promise.all(pausedPrinters.map(p => 
+      apiRequest(`/api/printers/${p.id}/resume`, { token, method: 'POST' }).catch(() => {})
+    ));
+  };
+
+  const groupCancel = async () => {
+    if (!token) return;
+    setErr(null);
+    await Promise.all(activePrinters.map(p => 
+      apiRequest(`/api/printers/${p.id}/cancel`, { token, method: 'POST' }).catch(() => {})
+    ));
+  };
+
   useEffect(() => {
     if (!token) return;
     return ws.subscribe((ev) => {
@@ -179,11 +227,72 @@ export default function DashboardPage() {
     <>
       <div className="flex items-center justify-between">
         <div className="text-xs text-textSecondary">Your printers</div>
-        <Link href="/printers" className="hidden" />
+        <div className="flex items-center gap-2">
+          {/* View mode toggle */}
+          <div className="flex rounded-btn border border-border/50 p-0.5">
+            <button
+              type="button"
+              onClick={() => setViewMode('cards')}
+              className={`rounded-sm p-1.5 transition ${viewMode === 'cards' ? 'bg-surface2 text-textPrimary' : 'text-textMuted'}`}
+              title="Card view"
+            >
+              <LayoutGrid size={14} />
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('compact')}
+              className={`rounded-sm p-1.5 transition ${viewMode === 'compact' ? 'bg-surface2 text-textPrimary' : 'text-textMuted'}`}
+              title="Compact view"
+            >
+              <List size={14} />
+            </button>
+          </div>
+          <Link href="/printers" className="hidden" />
+        </div>
       </div>
 
+      {/* Group actions bar */}
+      {activePrinters.length > 1 && (
+        <div className="mt-2 flex items-center gap-2 rounded-btn border border-border/45 bg-surface2/55 p-2">
+          <div className="text-xs text-textMuted">
+            {activePrinters.length} active
+          </div>
+          <div className="flex-1" />
+          {printingPrinters.length > 0 && (
+            <Button
+              variant="secondary"
+              className="px-2 py-1 text-[10px]"
+              onClick={() => setGroupActionConfirm({ open: true, action: 'pause', count: printingPrinters.length })}
+            >
+              <Pause size={12} className="mr-1" />
+              Pause all
+            </Button>
+          )}
+          {pausedPrinters.length > 0 && (
+            <Button
+              variant="secondary"
+              className="px-2 py-1 text-[10px]"
+              onClick={() => setGroupActionConfirm({ open: true, action: 'resume', count: pausedPrinters.length })}
+            >
+              <Play size={12} className="mr-1" />
+              Resume all
+            </Button>
+          )}
+          <Button
+            variant="secondary"
+            className="px-2 py-1 text-[10px]"
+            onClick={() => setGroupActionConfirm({ open: true, action: 'cancel', count: activePrinters.length })}
+          >
+            <XCircle size={12} className="mr-1" />
+            Cancel all
+          </Button>
+        </div>
+      )}
+
       <div className="mt-3 space-y-3">
-        {printers.map((p) => {
+        {viewMode === 'cards' ? (
+          // Card view (existing)
+          printers.map((p) => {
           const st = p.snapshot.state;
           const showActions =
             st === 'printing' || st === 'paused' || st === 'error';
@@ -291,7 +400,62 @@ export default function DashboardPage() {
               )}
             </Card>
           );
-        })}
+        })
+        ) : (
+          // Compact view - comparison mode
+          <div className="space-y-2">
+            {/* Progress comparison */}
+            <div className="rounded-btn border border-border/45 bg-surface2/55 p-3">
+              <div className="text-xs font-medium text-textPrimary">Progress comparison</div>
+              <div className="mt-2 space-y-2">
+                {printers
+                  .filter(p => p.snapshot.state === 'printing' || p.snapshot.state === 'paused')
+                  .sort((a, b) => (b.snapshot.progress ?? 0) - (a.snapshot.progress ?? 0))
+                  .map(p => (
+                    <div key={p.id} className="flex items-center gap-2">
+                      <div className="w-24 truncate text-xs text-textSecondary">
+                        {printerLabelById.get(p.id) ?? p.displayName}
+                      </div>
+                      <div className="flex-1">
+                        <ProgressBar value01={p.snapshot.progress} />
+                      </div>
+                      <div className="w-12 text-right text-xs font-mono text-textPrimary">
+                        {fmtPct(p.snapshot.progress)}
+                      </div>
+                      <StatusPill state={p.snapshot.state} />
+                    </div>
+                  ))}
+                {printers.filter(p => p.snapshot.state === 'printing' || p.snapshot.state === 'paused').length === 0 && (
+                  <div className="text-xs text-textMuted">No active prints</div>
+                )}
+              </div>
+            </div>
+
+            {/* All printers list */}
+            <div className="rounded-btn border border-border/45 bg-surface2/55 p-3">
+              <div className="text-xs font-medium text-textPrimary">All printers</div>
+              <div className="mt-2 divide-y divide-border/30">
+                {printers.map(p => (
+                  <Link 
+                    key={p.id} 
+                    href={`/printers?focus=${encodeURIComponent(p.id)}`}
+                    className="flex items-center gap-3 py-2 last:pb-0"
+                  >
+                    <StatusPill state={p.snapshot.state} />
+                    <div className="flex-1 truncate text-xs text-textPrimary">
+                      {printerLabelById.get(p.id) ?? p.displayName}
+                    </div>
+                    <div className="text-xs text-textMuted">
+                      {p.snapshot.state === 'standby' ? 'Ready' : 
+                       p.snapshot.state === 'printing' ? fmtEta(p.snapshot.etaSec) :
+                       p.snapshot.state === 'paused' ? 'Paused' : 'Error'}
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
 
         {printers.length === 0 && !err && (
           <div className="mt-6">

@@ -8,6 +8,13 @@ import { ClientRoot } from './components/ClientRoot';
 export const metadata: Metadata = {
   title: 'Farma',
   description: 'Telegram Mini App for Klipper/Moonraker',
+  manifest: '/manifest.json',
+  themeColor: '#20d3c2',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'Farma',
+  },
 };
 
 export default function RootLayout({

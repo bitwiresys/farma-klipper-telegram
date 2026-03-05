@@ -163,3 +163,48 @@ model NotificationLog {
 
   @@unique([printerId, printSessionId, eventType])
 }
+
+model PushSubscription {
+  id          String   @id @default(cuid())
+  telegramId  String
+  endpoint    String
+  p256dh      String
+  auth        String
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([telegramId, endpoint])
+  @@index([telegramId])
+}
+
+model Webhook {
+  id        String   @id @default(cuid())
+  url       String
+  secret    String?
+  events    Json
+  enabled   Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  deliveries WebhookDelivery[]
+
+  @@index([enabled])
+}
+
+model WebhookDelivery {
+  id           String   @id @default(cuid())
+  webhookId    String
+  event        String
+  status       String
+  statusCode   Int
+  responseBody String?
+
+  createdAt DateTime @default(now())
+
+  webhook Webhook @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+
+  @@index([webhookId])
+  @@index([createdAt])
+}

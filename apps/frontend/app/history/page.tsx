@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 
+import { Download, Filter } from 'lucide-react';
+
 import type { PrintHistoryDto, PrinterDto } from '../lib/dto';
 
 import { BottomSheet } from '../components/ui/BottomSheet';
@@ -16,6 +18,12 @@ import { useWs } from '../ws/ws_context';
 type StatusFilter = 'all' | 'completed' | 'error' | 'cancelled';
 
 const PAGE_SIZE = 20;
+
+function fmtDate(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toISOString().split('T')[0] ?? iso;
+}
 
 function fmtDateTime(iso: string): string {
   const d = new Date(iso);
@@ -46,12 +54,26 @@ function resolveThumbUrl(url: string): string {
   return raw.startsWith('/') ? `${base}${raw}` : `${base}/${raw}`;
 }
 
+function downloadFile(content: string, filename: string, mimeType: string) {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export default function HistoryPage() {
   const { token } = useAuth();
   const ws = useWs();
   const [err, setErr] = useState<string | null>(null);
 
   const [status, setStatus] = useState<StatusFilter>('all');
+  const [printerFilter, setPrinterFilter] = useState<string>('all');
+  const [dateFrom, setDateFrom] = useState<string>('');
+  const [dateTo, setDateTo] = useState<string>('');
+  const [showFilters, setShowFilters] = useState(false);
   const [history, setHistory] = useState<PrintHistoryDto[]>([]);
   const [printers, setPrinters] = useState<PrinterDto[]>([]);
   const [pagesLoaded, setPagesLoaded] = useState(1);
@@ -69,6 +91,52 @@ export default function HistoryPage() {
     if (!activeId) return null;
     return history.find((x) => x.id === activeId) ?? null;
   }, [activeId, history]);
+
+  // Filter history by printer and date (client-side)
+  const filteredHistory = useMemo(() => {
+    let result = history;
+    if (printerFilter !== 'all') {
+      result = result.filter(h => h.printerId === printerFilter);
+    }
+    if (dateFrom) {
+      result = result.filter(h => fmtDate(h.startedAt) >= dateFrom);
+    }
+    if (dateTo) {
+      result = result.filter(h => fmtDate(h.startedAt) <= dateTo);
+    }
+    return result;
+  }, [history, printerFilter, dateFrom, dateTo]);
+
+  // Export functions
+  const exportCsv = () => {
+    const headers = ['Filename', 'Printer', 'Status', 'Started', 'Ended', 'Duration (min)', 'Filament (mm)'];
+    const rows = filteredHistory.map(h => [
+      h.filename,
+      printerLabelById.get(h.printerId) ?? h.printerId,
+      h.status,
+      h.startedAt,
+      h.endedAt ?? '',
+      h.printDurationSec ? Math.round(h.printDurationSec / 60) : '',
+      h.filamentUsedMm ?? '',
+    ]);
+    const csv = [headers, ...rows].map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+    downloadFile(csv, 'history.csv', 'text/csv');
+  };
+
+  const exportJson = () => {
+    const data = filteredHistory.map(h => ({
+      filename: h.filename,
+      printer: printerLabelById.get(h.printerId) ?? h.printerId,
+      status: h.status,
+      startedAt: h.startedAt,
+      endedAt: h.endedAt,
+      printDurationSec: h.printDurationSec,
+      totalDurationSec: h.totalDurationSec,
+      filamentUsedMm: h.filamentUsedMm,
+      errorMessage: h.errorMessage,
+    }));
+    downloadFile(JSON.stringify(data, null, 2), 'history.json', 'application/json');
+  };
 
   const requestHistory = (opts?: { reset?: boolean; pages?: number }) => {
     if (!token) return;
@@ -146,6 +214,26 @@ export default function HistoryPage() {
     <>
       <div className="flex items-center justify-between">
         <div className="text-xs text-textSecondary">History</div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowFilters(f => !f)}
+            className={`rounded-btn p-1.5 transition ${showFilters ? 'bg-surface2 text-textPrimary' : 'text-textMuted'}`}
+            title="Filters"
+          >
+            <Filter size={14} />
+          </button>
+          {filteredHistory.length > 0 && (
+            <button
+              type="button"
+              onClick={() => exportCsv()}
+              className="rounded-btn p-1.5 text-textMuted transition hover:text-textPrimary"
+              title="Export CSV"
+            >
+              <Download size={14} />
+            </button>
+          )}
+        </div>
       </div>
 
       {!token && (
@@ -155,6 +243,57 @@ export default function HistoryPage() {
 
       {token && (
         <>
+          {/* Extended filters */}
+          {showFilters && (
+            <div className="mt-2 space-y-2 rounded-btn border border-border/45 bg-surface2/55 p-3">
+              <div className="text-xs font-medium text-textPrimary">Filters</div>
+              
+              {/* Printer filter */}
+              <div className="space-y-1">
+                <div className="text-xs text-textMuted">Printer</div>
+                <select
+                  value={printerFilter}
+                  onChange={e => setPrinterFilter(e.target.value)}
+                  className="w-full rounded-btn border border-border/50 bg-surface px-2 py-1.5 text-xs text-textPrimary"
+                >
+                  <option value="all">All printers</option>
+                  {printers.map(p => (
+                    <option key={p.id} value={p.id}>{printerLabelById.get(p.id) ?? p.displayName}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Date range */}
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <div className="text-xs text-textMuted">From</div>
+                  <input
+                    type="date"
+                    value={dateFrom}
+                    onChange={e => setDateFrom(e.target.value)}
+                    className="w-full rounded-btn border border-border/50 bg-surface px-2 py-1.5 text-xs text-textPrimary"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <div className="text-xs text-textMuted">To</div>
+                  <input
+                    type="date"
+                    value={dateTo}
+                    onChange={e => setDateTo(e.target.value)}
+                    className="w-full rounded-btn border border-border/50 bg-surface px-2 py-1.5 text-xs text-textPrimary"
+                  />
+                </div>
+              </div>
+
+              {/* Clear filters */}
+              {(printerFilter !== 'all' || dateFrom || dateTo) && (
+                <Button variant="ghost" onClick={() => { setPrinterFilter('all'); setDateFrom(''); setDateTo(''); }}>
+                  Clear filters
+                </Button>
+              )}
+            </div>
+          )}
+
           <div className="mt-3 flex flex-wrap gap-2">
             <button type="button" onClick={() => setStatus('all')}>
               <Chip active={status === 'all'}>All</Chip>
@@ -171,7 +310,7 @@ export default function HistoryPage() {
           </div>
 
           <div className="mt-3 space-y-2">
-            {history.map((h) => (
+            {filteredHistory.map((h) => (
               <button
                 key={h.id}
                 className="w-full text-left"
@@ -212,6 +351,9 @@ export default function HistoryPage() {
                 </Card>
               </button>
             ))}
+            {filteredHistory.length === 0 && history.length > 0 && (
+              <div className="text-xs text-textSecondary">No matches for selected filters.</div>
+            )}
             {history.length === 0 && (
               <div className="text-xs text-textSecondary">No history.</div>
             )}

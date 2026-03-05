@@ -29,12 +29,14 @@
     "jsonwebtoken": "^9.0.2",
     "pino": "^9.6.0",
     "telegraf": "^4.16.3",
+    "web-push": "^3.6.7",
     "ws": "^8.18.0",
     "zod": "^3.24.1"
   },
   "devDependencies": {
     "@types/jsonwebtoken": "^9.0.7",
     "@types/node": "^22.13.1",
+    "@types/web-push": "^3.5.4",
     "@types/ws": "^8.18.1",
     "prisma": "^6.3.1",
     "vitest": "^2.1.8",

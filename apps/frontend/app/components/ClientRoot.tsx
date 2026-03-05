@@ -7,6 +7,7 @@ import { AuthProvider } from '../auth/auth_context';
 import { BootstrapGate } from './BootstrapGate';
 import { WsProvider } from '../ws/ws_context';
 import { useWs } from '../ws/ws_context';
+import { I18nProvider } from '../lib/use_locale';
 
 function Shell({ children }: { children: ReactNode }) {
   const ws = useWs();
@@ -17,9 +18,11 @@ export function ClientRoot({ children }: { children: ReactNode }) {
   return (
     <AuthProvider>
       <WsProvider>
-        <BootstrapGate>
-          <Shell>{children}</Shell>
-        </BootstrapGate>
+        <I18nProvider>
+          <BootstrapGate>
+            <Shell>{children}</Shell>
+          </BootstrapGate>
+        </I18nProvider>
       </WsProvider>
     </AuthProvider>
   );

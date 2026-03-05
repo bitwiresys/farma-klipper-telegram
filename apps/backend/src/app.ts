@@ -19,6 +19,9 @@ import { registerNotificationSettingsRoutes } from './routes_settings_notificati
 import { registerNotificationDiagnosticsRoutes } from './routes_notifications_diagnostics.js';
 import { registerStatusRoutes } from './routes_status.js';
 import { registerSecurityRoutes } from './routes_security.js';
+import { registerPushRoutes } from './routes_push.js';
+import { registerAnalyticsRoutes } from './routes_analytics.js';
+import { registerWebhookRoutes } from './routes_webhooks.js';
 import { registerWsHub } from './ws_hub.js';
 
 export async function buildApp() {
@@ -72,6 +75,9 @@ export async function buildApp() {
   await registerNotificationDiagnosticsRoutes(app);
   await registerStatusRoutes(app);
   await registerSecurityRoutes(app);
+  await registerPushRoutes(app);
+  await registerAnalyticsRoutes(app);
+  await registerWebhookRoutes(app);
   await registerWsHub(app);
 
   return app;

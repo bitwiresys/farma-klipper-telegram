@@ -13,10 +13,13 @@
     "typecheck": "pnpm -r typecheck",
     "dev": "pnpm -r dev",
     "build": "pnpm -r build",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
     "check": "pnpm format:check && pnpm lint && pnpm -r typecheck && pnpm -r build && pnpm --filter @farma/backend prisma:generate && pnpm --filter @farma/backend prisma:validate && pnpm --filter @farma/backend test && python tools/scan_secrets.py && node tools/check_env_sync.mjs && node tools/contract_check.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.19.0",
+    "@playwright/test": "^1.49.0",
     "eslint": "^9.19.0",
     "prettier": "^3.4.2",
     "typescript": "^5.7.3"
