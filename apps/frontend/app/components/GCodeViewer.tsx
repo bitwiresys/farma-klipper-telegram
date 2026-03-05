@@ -199,6 +199,34 @@ export function GCodeViewer({
         el.append(r.element());
         rendererRef.current = r;
 
+        // Override fitCamera to properly scale model to viewport
+        (r as any).fitCamera = function() {
+          const parser = this.parser;
+          if (!parser.min || !parser.max) return;
+          
+          const sizeX = parser.max.x - parser.min.x;
+          const sizeY = parser.max.y - parser.min.y;
+          const sizeZ = parser.max.z - parser.min.z;
+          const maxDim = Math.max(sizeX, sizeY, sizeZ);
+          
+          const fov = this.camera.fov || 75;
+          const cameraDistance = (maxDim / 2) / Math.tan((fov * Math.PI / 360)) * 1.3;
+          
+          const centerX = (parser.min.x + parser.max.x) / 2;
+          const centerY = (parser.min.y + parser.max.y) / 2;
+          const centerZ = (parser.min.z + parser.max.z) / 2;
+          
+          this.camera.position.x = centerX;
+          this.camera.position.y = centerY - cameraDistance * 0.4;
+          this.camera.position.z = parser.max.z + cameraDistance * 0.6;
+          
+          if (this.cameraControl) {
+            this.cameraControl.target.set(centerX, centerY, centerZ);
+          }
+          this.camera.lookAt(centerX, centerY, centerZ);
+          this.draw();
+        };
+
         await r.render();
         if (disposed) return;
 
