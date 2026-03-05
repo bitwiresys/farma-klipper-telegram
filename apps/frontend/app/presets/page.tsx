@@ -11,6 +11,7 @@ import { Chip } from '../components/ui/Chip';
 import { EmptyState } from '../components/ui/EmptyState';
 import { SearchInput } from '../components/ui/SearchInput';
 import { useAuth } from '../auth/auth_context';
+import { getBackendBaseUrl } from '../lib/env';
 import { useWs } from '../ws/ws_context';
 
 type WsEvent = { type: string; payload: any };
@@ -36,6 +37,15 @@ function fmtNozzle(xs: number[]): string {
   if (xs.length === 0) return 'nozzle any';
   const sorted = [...xs].sort((a, b) => a - b);
   return `${sorted.join(', ')}`;
+}
+
+function resolveThumbUrl(url: string): string {
+  const raw = String(url ?? '').trim();
+  if (!raw) return '';
+  if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
+  const base = (getBackendBaseUrl() ?? '').replace(/\/+$/, '');
+  if (!base) return raw;
+  return raw.startsWith('/') ? `${base}${raw}` : `${base}/${raw}`;
 }
 
 export default function PresetsPage() {
@@ -138,7 +148,7 @@ export default function PresetsPage() {
                     {p.thumbnailUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
-                        src={p.thumbnailUrl}
+                        src={resolveThumbUrl(p.thumbnailUrl)}
                         alt="thumbnail"
                         className="h-full w-full object-cover"
                       />

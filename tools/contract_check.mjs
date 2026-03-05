@@ -4,7 +4,6 @@ import path from 'node:path';
 const repoRoot = path.resolve(import.meta.dirname, '..');
 
 function fail(msg) {
-  // eslint-disable-next-line no-console
   console.error(`contract_check: ${msg}`);
   process.exit(1);
 }
@@ -121,7 +120,6 @@ async function main() {
     }
   }
 
-  // eslint-disable-next-line no-console
   console.log('contract_check: OK');
 }
 

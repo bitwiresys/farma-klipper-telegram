@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 
 import { computePresetCompatibilityReasons } from '../../lib/compatibility';
@@ -13,6 +13,7 @@ import { Chip } from '../../components/ui/Chip';
 import { Switch } from '../../components/ui/Switch';
 import { useAuth } from '../../auth/auth_context';
 import { apiRequest, tryParseApiErrorBody, type ApiError } from '../../lib/api';
+import { getBackendBaseUrl } from '../../lib/env';
 import { useWs } from '../../ws/ws_context';
 import { buildPrinterLabelById } from '../../lib/printer_label';
 import type { CompatibilityReason, PresetDto, PrinterDto } from '../../lib/dto';
@@ -55,9 +56,33 @@ function textColorForBg(hex: string): string {
   return lum > 0.62 ? '#0b1220' : '#f8fafc';
 }
 
+function resolveThumbUrl(url: string): string {
+  const raw = String(url ?? '').trim();
+  if (!raw) return '';
+  if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
+  const base = (getBackendBaseUrl() ?? '').replace(/\/+$/, '');
+  if (!base) return raw;
+  return raw.startsWith('/') ? `${base}${raw}` : `${base}/${raw}`;
+}
+
+function fmtEta(sec: number | null): string {
+  if (sec === null || !Number.isFinite(sec)) return '—';
+  const s0 = Math.max(0, Math.floor(sec));
+  const d = Math.floor(s0 / 86400);
+  const h = Math.floor((s0 % 86400) / 3600);
+  const m = Math.floor((s0 % 3600) / 60);
+  const s = s0 % 60;
+
+  if (d > 0) return `${d}d ${h}h ${m}m ${s}s`;
+  if (h > 0) return `${h}h ${m}m ${s}s`;
+  if (m > 0) return `${m}m ${s}s`;
+  return `${s}s`;
+}
+
 export default function PresetDetailPage() {
   const params = useParams();
   const presetId = String((params as any).id ?? '');
+  const router = useRouter();
 
   const { token } = useAuth();
   const ws = useWs();
@@ -142,6 +167,12 @@ export default function PresetDetailPage() {
     return buildPrinterLabelById(printers);
   }, [printers]);
 
+  const modelNameById = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const p of printers) m.set(p.modelId, p.modelName);
+    return m;
+  }, [printers]);
+
   const selectablePrinterIds = useMemo(() => {
     return printersWithReasons
       .filter((x) => !x.reasons.includes('MODEL_NOT_ALLOWED'))
@@ -207,6 +238,8 @@ export default function PresetDetailPage() {
         }));
 
       setResults(rows);
+
+      router.push('/printers');
     } catch (e) {
       const ae = e as ApiError;
       const body = tryParseApiErrorBody(ae.bodyText) as any;
@@ -269,7 +302,7 @@ export default function PresetDetailPage() {
               {preset.thumbnailUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                  src={preset.thumbnailUrl}
+                  src={resolveThumbUrl(preset.thumbnailUrl)}
                   alt="thumbnail"
                   className="h-full w-full object-cover"
                 />
@@ -304,13 +337,9 @@ export default function PresetDetailPage() {
             <div className="text-xs font-medium text-textPrimary">Metadata</div>
             <div className="mt-2 space-y-1 text-xs text-textSecondary">
               <div>
-                Estimated time: {preset.gcodeMeta?.estimated_time_sec ?? '—'}
+                Estimated time:{' '}
+                {fmtEta(preset.gcodeMeta?.estimated_time_sec ?? null)}
               </div>
-              <div>
-                Nozzle: {preset.gcodeMeta?.gcode_nozzle_diameter ?? '—'}
-              </div>
-              <div>Filament: {preset.gcodeMeta?.filament_name ?? '—'}</div>
-              <div>Filament type: {preset.gcodeMeta?.filament_type ?? '—'}</div>
             </div>
           </Card>
 
@@ -321,8 +350,10 @@ export default function PresetDetailPage() {
             <div className="mt-2 flex flex-wrap gap-2">
               <Chip>
                 {preset.compatibilityRules.allowedModelIds.length > 0
-                  ? 'models'
-                  : 'models any'}
+                  ? preset.compatibilityRules.allowedModelIds
+                      .map((id) => modelNameById.get(id) ?? id)
+                      .join(', ')
+                  : 'Any model'}
               </Chip>
               <Chip>
                 {preset.compatibilityRules.allowedNozzleDiameters.length > 0
@@ -333,7 +364,7 @@ export default function PresetDetailPage() {
                   : 'nozzle any'}
               </Chip>
               <Chip>
-                bed {preset.compatibilityRules.minBedX}×
+                bed ≥ {preset.compatibilityRules.minBedX}×
                 {preset.compatibilityRules.minBedY}
               </Chip>
             </div>
