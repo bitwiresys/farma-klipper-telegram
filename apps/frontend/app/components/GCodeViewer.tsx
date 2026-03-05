@@ -3,6 +3,34 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Color, GCodeRenderer } from 'gcode-viewer';
 
+function sanitizeGCode(input: string): string {
+  // Remove non-standard lines that can contain huge numeric blobs (e.g. EXCLUDE_OBJECT_DEFINE)
+  // and strip comments to keep the viewer parser stable.
+  const out: string[] = [];
+  const lines = input.split(/\r?\n/);
+  for (const raw of lines) {
+    const line0 = raw.trim();
+    if (!line0) continue;
+
+    // Keep slicer layer markers as comments (viewer uses Z by default anyway)
+    if (line0.startsWith(';')) {
+      continue;
+    }
+
+    // Remove inline comments
+    const semi = line0.indexOf(';');
+    const line = (semi >= 0 ? line0.slice(0, semi) : line0).trim();
+    if (!line) continue;
+
+    // Accept only common gcode commands (G/M/T) to avoid custom macros producing NaNs.
+    // This drops e.g. SET_PIN / EXCLUDE_OBJECT_DEFINE / START_PRINT etc.
+    if (!/^[GMT]\d+/i.test(line)) continue;
+
+    out.push(line);
+  }
+  return out.join('\n');
+}
+
 type GCodeViewerProps = {
   printerId: string;
   filename: string;
@@ -40,6 +68,8 @@ export function GCodeViewer({
   const [layerCount, setLayerCount] = useState(0);
   const [simLayer, setSimLayer] = useState(0);
   const [simLayerPct, setSimLayerPct] = useState(100);
+  const [ready, setReady] = useState(false);
+  const [userInteracted, setUserInteracted] = useState(false);
 
   const derivedLayer = useMemo(() => {
     const total = Math.max(1, totalLayers ?? layerCount);
@@ -47,6 +77,14 @@ export function GCodeViewer({
     const base = currentLayer ?? byProgress;
     return Math.max(0, base);
   }, [currentLayer, layerCount, progress, totalLayers]);
+
+  // Keep sliders in sync with real print progress until the user touches them.
+  useEffect(() => {
+    if (userInteracted) return;
+    if (layerCount <= 0) return;
+    setSimLayer(Math.min(derivedLayer, layerCount - 1));
+    setSimLayerPct(Math.max(0, Math.min(Math.round(progress), 100)));
+  }, [derivedLayer, layerCount, progress, userInteracted]);
 
   // Load + render via gcode-viewer
   useEffect(() => {
@@ -59,6 +97,8 @@ export function GCodeViewer({
     const load = async () => {
       setLoading(true);
       setError(null);
+      setReady(false);
+      setUserInteracted(false);
 
       try {
         const res = await fetch(
@@ -72,8 +112,10 @@ export function GCodeViewer({
           throw new Error(`Failed to load G-code: ${res.status} ${t.slice(0, 120)}`);
         }
 
-        const gcodeString = await res.text();
+        const gcodeStringRaw = await res.text();
         if (disposed) return;
+
+        const gcodeString = sanitizeGCode(gcodeStringRaw);
 
         // cleanup previous renderer
         if (rendererRef.current) {
@@ -100,11 +142,27 @@ export function GCodeViewer({
         await r.render();
         if (disposed) return;
 
+        // Ensure correct sizing after Telegram viewport settles
+        try {
+          r.resize(Math.max(10, el.clientWidth), Math.max(10, el.clientHeight));
+        } catch {
+          // ignore
+        }
+        try {
+          (r as any).fitCamera?.();
+        } catch {
+          // ignore
+        }
+
         const defs = r.getLayerDefinitionsNoCopy?.() ?? r.getLayerDefinitions?.() ?? [];
         const lc = Array.isArray(defs) ? defs.length : 0;
         setLayerCount(lc);
-        setSimLayer((x) => (lc > 0 ? Math.min(x, lc - 1) : 0));
+        setSimLayer((x) => {
+          if (lc <= 0) return 0;
+          return Math.min(userInteracted ? x : derivedLayer, lc - 1);
+        });
         setLoading(false);
+        setReady(true);
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         setError(msg);
@@ -124,11 +182,20 @@ export function GCodeViewer({
       } catch {
         // ignore
       }
+      try {
+        (r as any).fitCamera?.();
+      } catch {
+        // ignore
+      }
     };
+
+    const ro = new ResizeObserver(() => onResize());
+    ro.observe(el);
     window.addEventListener('resize', onResize);
 
     return () => {
       disposed = true;
+      ro.disconnect();
       window.removeEventListener('resize', onResize);
     };
   }, [filename, lowPoly, printerId, token]);
@@ -139,8 +206,7 @@ export function GCodeViewer({
     if (!r) return;
     if (layerCount <= 0) return;
 
-    const activeLayer = simulationMode ? simLayer : Math.min(derivedLayer, layerCount - 1);
-    const maxLayer = Math.max(0, Math.min(activeLayer, layerCount - 1));
+    const maxLayer = Math.max(0, Math.min(simLayer, layerCount - 1));
 
     try {
       // show layers 0..maxLayer
@@ -157,10 +223,10 @@ export function GCodeViewer({
     } catch {
       // ignore
     }
-  }, [derivedLayer, layerCount, simLayer, simLayerPct, simulationMode]);
+  }, [layerCount, simLayer, simLayerPct, ready]);
 
   const total = Math.max(1, totalLayers ?? layerCount);
-  const displayLayer = simulationMode ? simLayer : Math.min(derivedLayer, Math.max(0, total - 1));
+  const displayLayer = Math.min(simLayer, Math.max(0, total - 1));
 
   return (
     <div className={`relative ${className}`}>
@@ -188,17 +254,18 @@ export function GCodeViewer({
                 style={{ height: `${((displayLayer + 1) / total) * 100}%` }}
               />
             </div>
-            {simulationMode && (
-              <input
-                type="range"
-                min={0}
-                max={Math.max(0, layerCount - 1)}
-                value={simLayer}
-                onChange={(e) => setSimLayer(parseInt(e.target.value))}
-                className="absolute inset-0 opacity-0 cursor-pointer"
-                style={{ writingMode: 'vertical-lr', direction: 'rtl' }}
-              />
-            )}
+            <input
+              type="range"
+              min={0}
+              max={Math.max(0, layerCount - 1)}
+              value={simLayer}
+              onChange={(e) => {
+                setUserInteracted(true);
+                setSimLayer(parseInt(e.target.value));
+              }}
+              className="absolute inset-0 opacity-0 cursor-pointer"
+              style={{ writingMode: 'vertical-lr', direction: 'rtl' }}
+            />
             <div className="text-[9px] text-textMuted mt-1">
               {displayLayer + 1}/{total}
             </div>
@@ -212,19 +279,20 @@ export function GCodeViewer({
                   className="absolute left-0 top-0 bottom-0 rounded-full bg-accentCyan transition-all"
                   style={{ width: `${simLayerPct}%` }}
                 />
-                {simulationMode && (
-                  <input
-                    type="range"
-                    min={0}
-                    max={100}
-                    value={simLayerPct}
-                    onChange={(e) => setSimLayerPct(parseInt(e.target.value))}
-                    className="absolute inset-0 opacity-0 cursor-pointer w-full"
-                  />
-                )}
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  value={simLayerPct}
+                  onChange={(e) => {
+                    setUserInteracted(true);
+                    setSimLayerPct(parseInt(e.target.value));
+                  }}
+                  className="absolute inset-0 opacity-0 cursor-pointer w-full"
+                />
               </div>
               <span className="text-[10px] text-textMuted w-12 text-right">
-                {simulationMode ? `${simLayerPct}%` : `${progress.toFixed(0)}%`}
+                {`${simLayerPct}%`}
               </span>
             </div>
           </div>
@@ -263,8 +331,10 @@ export function GCodeThumbnail({
           { headers: { Authorization: `Bearer ${token}` } },
         );
         if (!res.ok) return;
-        const gcodeString = await res.text();
+        const gcodeStringRaw = await res.text();
         if (disposed) return;
+
+        const gcodeString = sanitizeGCode(gcodeStringRaw);
 
         const r = new GCodeRenderer(gcodeString, 120, 120, new Color(0x0b0f14));
         r.radialSegments = 3;
@@ -274,6 +344,17 @@ export function GCodeThumbnail({
         el.append(r.element());
         await r.render();
         if (disposed) return;
+
+        try {
+          r.resize(120, 120);
+        } catch {
+          // ignore
+        }
+        try {
+          (r as any).fitCamera?.();
+        } catch {
+          // ignore
+        }
         setLoaded(true);
       } catch {
         // ignore
