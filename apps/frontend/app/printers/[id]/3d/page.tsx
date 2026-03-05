@@ -107,7 +107,7 @@ function GCode3DPageContent({ printerId }: { printerId: string }) {
   const totalLayers = printer?.snapshot.layers.total ?? null;
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex min-h-[calc(100dvh-220px)] flex-col">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-border/40 bg-surface1/80 px-3 py-2">
         <div className="flex items-center gap-2">
@@ -147,7 +147,7 @@ function GCode3DPageContent({ printerId }: { printerId: string }) {
       </div>
 
       {/* 3D Viewer */}
-      <div className="relative flex-1">
+      <div className="relative flex-1 min-h-0">
         {filename ? (
           <GCodeViewer
             printerId={printerId}
@@ -160,7 +160,7 @@ function GCode3DPageContent({ printerId }: { printerId: string }) {
             currentLayer={currentLayer}
             totalLayers={totalLayers}
             lowPoly={true}
-            className="h-full w-full"
+            className="h-full min-h-[320px] w-full"
           />
         ) : (
           <div className="flex h-full items-center justify-center text-textMuted">
