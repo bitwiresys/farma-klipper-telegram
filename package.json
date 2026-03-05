@@ -2,6 +2,12 @@
   "name": "farma",
   "private": true,
   "packageManager": "pnpm@9.15.6",
+  "pnpm": {
+    "overrides": {
+      "three": "0.151.3",
+      "@types/three": "0.151.0"
+    }
+  },
   "workspaces": [
     "apps/*",
     "packages/*"
