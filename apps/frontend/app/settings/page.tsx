@@ -260,8 +260,9 @@ export default function SettingsPage() {
                   </a>
                 ) : (
                   <div className="text-[11px] text-textMuted">
-                    Bot link is not configured. Set TELEGRAM_BOT_USERNAME in
-                    backend env (without @) to show a direct link.
+                    Bot link is unavailable. Backend could not resolve bot
+                    username via Telegram Bot API (getMe). Check that
+                    TELEGRAM_BOT_TOKEN is valid and backend has internet access.
                   </div>
                 )}
               </div>

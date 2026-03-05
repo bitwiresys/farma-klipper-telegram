@@ -4,6 +4,41 @@ import { env } from './env.js';
 import { getAllowedTelegramUserIds } from './env.js';
 import { prisma } from './prisma.js';
 
+let botUsernameCache: { value: string | null; tsMs: number } | null = null;
+let botUsernameInflight: Promise<string | null> | null = null;
+
+async function getBotUsernameFromTelegram(): Promise<string | null> {
+  // 12h TTL (best-effort, username changes are very rare)
+  const TTL_MS = 12 * 60 * 60_000;
+  const now = Date.now();
+  if (botUsernameCache && now - botUsernameCache.tsMs < TTL_MS) {
+    return botUsernameCache.value;
+  }
+
+  if (botUsernameInflight) return botUsernameInflight;
+
+  botUsernameInflight = (async () => {
+    try {
+      const token = env.TELEGRAM_BOT_TOKEN;
+      const url = `https://api.telegram.org/bot${token}/getMe`;
+      const res = await fetch(url, { method: 'GET' });
+      if (!res.ok) throw new Error(`getMe failed: ${res.status}`);
+      const body = (await res.json()) as any;
+      const username = String(body?.result?.username ?? '').trim();
+      const value = username ? username : null;
+      botUsernameCache = { value, tsMs: now };
+      return value;
+    } catch {
+      botUsernameCache = { value: null, tsMs: now };
+      return null;
+    } finally {
+      botUsernameInflight = null;
+    }
+  })();
+
+  return botUsernameInflight;
+}
+
 export async function registerSecurityRoutes(app: FastifyInstance) {
   app.get('/api/security', async (req, reply) => {
     const telegramId = req.auth?.telegramId;
@@ -28,7 +63,7 @@ export async function registerSecurityRoutes(app: FastifyInstance) {
         isAllowed: user.isAllowed,
       },
       telegram: {
-        botUsername: env.TELEGRAM_BOT_USERNAME || null,
+        botUsername: await getBotUsernameFromTelegram(),
       },
       allowedTelegramUserIds:
         allowed.size === 0 ? null : Array.from(allowed.values()).sort(),
