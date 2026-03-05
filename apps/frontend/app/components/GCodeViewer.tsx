@@ -22,11 +22,29 @@ function sanitizeGCode(input: string): string {
     const line = (semi >= 0 ? line0.slice(0, semi) : line0).trim();
     if (!line) continue;
 
+    // Drop any lines that already contain NaN/Infinity tokens.
+    if (/(^|[^a-z])(nan|inf|infinity)([^a-z]|$)/i.test(line)) continue;
+
     // Accept only common gcode commands (G/M/T) to avoid custom macros producing NaNs.
     // This drops e.g. SET_PIN / EXCLUDE_OBJECT_DEFINE / START_PRINT etc.
     if (!/^[GMT]\d+/i.test(line)) continue;
 
-    out.push(line);
+    // Strip invalid numeric params (e.g. Xnan, Yinf, X, X-)
+    // Keep the command even if it ends up with no params.
+    const parts = line.split(/\s+/);
+    const cmd = parts[0];
+    const cleaned: string[] = [cmd];
+    for (let i = 1; i < parts.length; i++) {
+      const p = parts[i];
+      if (!p) continue;
+      const m = /^([A-Za-z])([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)$/.exec(p);
+      if (!m) continue;
+      const v = Number(m[2]);
+      if (!Number.isFinite(v)) continue;
+      cleaned.push(`${m[1].toUpperCase()}${m[2]}`);
+    }
+
+    out.push(cleaned.join(' '));
   }
   return out.join('\n');
 }

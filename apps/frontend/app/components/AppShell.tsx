@@ -94,7 +94,7 @@ export function AppShell({
           : 'bg-offlineGray';
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-xl flex-col px-4 pb-24 pt-4">
+    <div className="mx-auto flex min-h-[100dvh] max-w-xl flex-col px-4 pb-24 pt-4">
       <div className="rounded-card border border-border/60 bg-surface1/70 p-3 shadow-[0_10px_35px_rgba(0,0,0,0.18)]">
         <div className="flex items-center justify-between">
           <div>
@@ -129,7 +129,7 @@ export function AppShell({
         )}
       </div>
 
-      <div className="mt-4 flex-1">{children}</div>
+      <div className="mt-4 flex-1 min-h-0">{children}</div>
 
       <div className="fixed bottom-4 left-0 right-0 z-20">
         <div className="mx-auto max-w-xl px-4">
