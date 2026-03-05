@@ -903,6 +903,39 @@ export class PrinterRuntimeManager {
         onGcodeResponse: (line) => {
           this.onGcodeLine?.(printerId, line);
         },
+        onKlippyReady: () => {
+          // Klipper restarted successfully - clear cached status and fetch fresh
+          this.rawStatus.delete(printerId);
+          this.cache.reset(printerId);
+          this.markDirty(printerId);
+          logger.info({ printerId }, 'klippy ready - reset snapshot cache');
+        },
+        onKlippyShutdown: () => {
+          // Klipper shutdown - set error state
+          const internal = this.cache.get(printerId);
+          if (internal) {
+            internal.snapshot = {
+              ...internal.snapshot,
+              state: PrinterState.error,
+              message: 'Klipper shutdown',
+            };
+            internal.updatedAtMs = Date.now();
+            this.markDirty(printerId);
+          }
+        },
+        onKlippyDisconnected: () => {
+          // Klipper disconnected - set error state
+          const internal = this.cache.get(printerId);
+          if (internal) {
+            internal.snapshot = {
+              ...internal.snapshot,
+              state: PrinterState.error,
+              message: 'Klipper disconnected',
+            };
+            internal.updatedAtMs = Date.now();
+            this.markDirty(printerId);
+          }
+        },
       },
     });
 

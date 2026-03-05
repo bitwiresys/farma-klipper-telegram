@@ -7,6 +7,9 @@ export type MoonrakerWsCallbacks = {
   onStatusUpdate: (diff: unknown) => void;
   onHistoryChanged: (payload: unknown) => void;
   onGcodeResponse: (line: string) => void;
+  onKlippyReady: () => void;
+  onKlippyShutdown: () => void;
+  onKlippyDisconnected: () => void;
 };
 
 export type MoonrakerWsConnectorOptions = {
@@ -289,6 +292,34 @@ export class MoonrakerWsConnector {
             this.pushGcode(line);
             this.opts.callbacks.onGcodeResponse(line);
           }
+          return;
+        }
+
+        // Klipper state notifications
+        if (parsed.method === 'notify_klippy_ready') {
+          logger.info(
+            { printerId: this.opts.printerId },
+            'moonraker klippy ready notification',
+          );
+          this.opts.callbacks.onKlippyReady();
+          return;
+        }
+
+        if (parsed.method === 'notify_klippy_shutdown') {
+          logger.warn(
+            { printerId: this.opts.printerId },
+            'moonraker klippy shutdown notification',
+          );
+          this.opts.callbacks.onKlippyShutdown();
+          return;
+        }
+
+        if (parsed.method === 'notify_klippy_disconnected') {
+          logger.warn(
+            { printerId: this.opts.printerId },
+            'moonraker klippy disconnected notification',
+          );
+          this.opts.callbacks.onKlippyDisconnected();
           return;
         }
       } catch (e) {

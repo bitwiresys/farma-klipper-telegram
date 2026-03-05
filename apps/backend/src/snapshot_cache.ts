@@ -64,4 +64,8 @@ export class SnapshotCache {
   set(printerId: string, next: SnapshotInternal) {
     this.map.set(printerId, next);
   }
+
+  reset(printerId: string) {
+    this.map.delete(printerId);
+  }
 }
