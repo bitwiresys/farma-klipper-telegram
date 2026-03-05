@@ -161,6 +161,7 @@ export function GCodeViewer({
   simulationMode = false,
 }: GCodeViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
   const rendererRef = useRef<GCodeRenderer | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -170,6 +171,18 @@ export function GCodeViewer({
   const [ready, setReady] = useState(false);
   const [userInteracted, setUserInteracted] = useState(false);
   const [containerSize, setContainerSize] = useState({ w: 0, h: 0 });
+  const [joeReady, setJoeReady] = useState(false);
+  const [joeGCode, setJoeGCode] = useState<string | null>(null);
+
+  const useJoeViewer = useMemo(() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      const sp = new URLSearchParams(window.location.search);
+      return sp.get('viewer') === 'joe';
+    } catch {
+      return false;
+    }
+  }, []);
 
   const derivedLayer = useMemo(() => {
     const total = Math.max(1, totalLayers ?? layerCount);
@@ -177,6 +190,41 @@ export function GCodeViewer({
     const base = currentLayer ?? byProgress;
     return Math.max(0, base);
   }, [currentLayer, layerCount, progress, totalLayers]);
+
+  useEffect(() => {
+    if (!useJoeViewer) return;
+
+    const onMessage = (event: MessageEvent) => {
+      try {
+        if (event.origin !== window.location.origin) return;
+        const data = event.data as any;
+        if (!data || typeof data !== 'object') return;
+        if (data.type === 'gcode-viewer:ready') {
+          setJoeReady(true);
+        }
+      } catch {
+        // ignore
+      }
+    };
+
+    window.addEventListener('message', onMessage);
+    return () => window.removeEventListener('message', onMessage);
+  }, [useJoeViewer]);
+
+  useEffect(() => {
+    if (!useJoeViewer) return;
+    if (!joeReady) return;
+    if (!joeGCode) return;
+
+    try {
+      iframeRef.current?.contentWindow?.postMessage(
+        { type: 'gcode-viewer:set-gcode', gcode: joeGCode },
+        window.location.origin,
+      );
+    } catch {
+      // ignore
+    }
+  }, [joeGCode, joeReady, useJoeViewer]);
 
   // Keep sliders in sync with real print progress until the user touches them.
   useEffect(() => {
@@ -188,6 +236,7 @@ export function GCodeViewer({
 
   // Load + render via gcode-viewer
   useEffect(() => {
+    if (useJoeViewer) return;
     if (!containerRef.current) return;
     if (!token) return;
 
@@ -348,10 +397,66 @@ export function GCodeViewer({
       window.visualViewport?.removeEventListener('scroll', onResize);
       tg?.offEvent?.('viewportChanged', onTgViewport);
     };
-  }, [filename, lowPoly, printerId, token, containerSize.w, containerSize.h]);
+  }, [
+    filename,
+    lowPoly,
+    printerId,
+    token,
+    containerSize.w,
+    containerSize.h,
+    useJoeViewer,
+  ]);
+
+  useEffect(() => {
+    if (!useJoeViewer) return;
+    if (!token) return;
+
+    let disposed = false;
+
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+      setReady(false);
+      setJoeReady(false);
+      setJoeGCode(null);
+
+      try {
+        const res = await fetch(
+          `/api/gcode/${printerId}?filename=${encodeURIComponent(filename)}`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          },
+        );
+        if (!res.ok) {
+          const t = await res.text().catch(() => '');
+          throw new Error(
+            `Failed to load G-code: ${res.status} ${t.slice(0, 120)}`,
+          );
+        }
+
+        const gcodeStringRaw = await res.text();
+        if (disposed) return;
+
+        const gcodeString = sanitizeGCode(gcodeStringRaw);
+        setJoeGCode(gcodeString);
+        setLoading(false);
+        setReady(true);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        setError(msg);
+        setLoading(false);
+      }
+    };
+
+    load();
+    return () => {
+      disposed = true;
+    };
+  }, [filename, printerId, token, useJoeViewer]);
 
   // Apply slicing based on slider state
   useEffect(() => {
+    if (useJoeViewer) return;
     const r = rendererRef.current;
     if (!r) return;
     if (layerCount <= 0) return;
@@ -389,14 +494,23 @@ export function GCodeViewer({
     } catch {
       // ignore
     }
-  }, [layerCount, simLayer, simLayerPct, ready]);
+  }, [layerCount, simLayer, simLayerPct, ready, useJoeViewer]);
 
   const total = Math.max(1, totalLayers ?? layerCount);
   const displayLayer = Math.min(simLayer, Math.max(0, total - 1));
 
   return (
     <div className={`relative overflow-hidden ${className}`}>
-      <div ref={containerRef} className="absolute inset-0" />
+      {useJoeViewer ? (
+        <iframe
+          ref={iframeRef}
+          className="absolute inset-0"
+          src="/vendor/joewalnes-gcode-viewer/index.html"
+          title="GCode Viewer"
+        />
+      ) : (
+        <div ref={containerRef} className="absolute inset-0" />
+      )}
 
       {loading && (
         <div className="absolute inset-0 flex items-center justify-center bg-bg/80">
@@ -410,7 +524,7 @@ export function GCodeViewer({
         </div>
       )}
 
-      {showProgress && layerCount > 0 && (
+      {showProgress && !useJoeViewer && layerCount > 0 && (
         <>
           {/* Vertical layer slider - minimalist */}
           <div className="absolute right-3 top-3 bottom-14 w-1.5 flex flex-col items-center">

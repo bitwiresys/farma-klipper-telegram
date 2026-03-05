@@ -8,6 +8,7 @@ export default [
       '**/.next/**',
       '**/coverage/**',
       '**/apps/frontend/out/**',
+      '**/apps/frontend/public/vendor/joewalnes-gcode-viewer/**',
       '**/docs/src/js/**',
       '**/apps/backend/prisma/migrations/**',
     ],
