@@ -202,7 +202,7 @@ export function GCodeViewer({
         scheduleResize();
 
         const defs = r.getLayerDefinitionsNoCopy?.() ?? r.getLayerDefinitions?.() ?? [];
-        const lc = Array.isArray(defs) ? defs.length : 0;
+        const lc = Math.max(0, r.layerCount?.() ?? (Array.isArray(defs) ? defs.length : 0));
         setLayerCount(lc);
         setSimLayer((x) => {
           if (lc <= 0) return 0;
@@ -240,20 +240,36 @@ export function GCodeViewer({
     if (!r) return;
     if (layerCount <= 0) return;
 
+    const pointsCount = r.pointsCount?.() ?? 0;
+    if (!Number.isFinite(pointsCount) || pointsCount <= 0) return;
+
     const maxLayer = Math.max(0, Math.min(simLayer, layerCount - 1));
 
     try {
-      // show layers 0..maxLayer
-      r.sliceLayer(0, maxLayer);
-
-      // slice within current layer for "layer progress" slider
+      // Compute a safe slice end based on layer definition.
+      // gcode-viewer LayerDefinition has { start, end } as point numbers.
       const def = r.getLayerDefinition(maxLayer);
-      const start = (def as any)?.startPointNr ?? (def as any)?.start ?? 0;
-      const end = (def as any)?.endPointNr ?? (def as any)?.end ?? start;
-      const span = Math.max(0, end - start);
+      const layerStart = (def as any)?.start;
+      const layerEnd = (def as any)?.end;
+
+      if (!Number.isFinite(layerStart) || !Number.isFinite(layerEnd)) {
+        r.slice(0, pointsCount);
+        return;
+      }
+
+      const start = Math.max(0, Math.min(layerStart, pointsCount));
+      const endExclusive = Math.max(start, Math.min(layerEnd + 1, pointsCount));
+      const span = Math.max(0, endExclusive - start);
       const pct01 = Math.max(0, Math.min(simLayerPct / 100, 1));
       const until = start + Math.floor(span * pct01);
-      r.slice(0, until);
+
+      if (!Number.isFinite(until)) {
+        r.slice(0, endExclusive);
+        return;
+      }
+
+      const untilClamped = Math.max(0, Math.min(until, pointsCount));
+      r.slice(0, untilClamped);
     } catch {
       // ignore
     }
