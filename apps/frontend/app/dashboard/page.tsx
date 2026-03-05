@@ -337,6 +337,7 @@ export default function DashboardPage() {
                   <GCodeThumbnail
                     printerId={p.id}
                     filename={p.snapshot.filename}
+                    token={token ?? ''}
                     className="h-[80px] w-full object-cover"
                   />
                 </Link>

@@ -150,6 +150,7 @@ function GCode3DPageContent({ printerId }: { printerId: string }) {
           <GCodeViewer
             printerId={printerId}
             filename={filename}
+            token={token ?? ''}
             toolheadPosition={toolheadPos ?? undefined}
             showNozzle={true}
             showProgress={true}

@@ -7,6 +7,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 type GCodeViewerProps = {
   printerId: string;
   filename: string;
+  token: string;
   toolheadPosition?: { x: number; y: number; z: number };
   showNozzle?: boolean;
   showProgress?: boolean;
@@ -90,6 +91,7 @@ function parseGCode(gcode: string, lowPoly: boolean): { positions: Float32Array;
 export function GCodeViewer({
   printerId,
   filename,
+  token,
   toolheadPosition,
   showNozzle = true,
   showProgress = true,
@@ -209,14 +211,18 @@ export function GCodeViewer({
 
   // Load G-code file
   useEffect(() => {
-    if (!sceneRef.current) return;
+    if (!sceneRef.current || !token) return;
 
     const loadGCode = async () => {
       setLoading(true);
       setError(null);
 
       try {
-        const res = await fetch(`/api/gcode/${printerId}?filename=${encodeURIComponent(filename)}`);
+        const res = await fetch(`/api/gcode/${printerId}?filename=${encodeURIComponent(filename)}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
         if (!res.ok) {
           throw new Error(`Failed to load G-code: ${res.status}`);
         }
@@ -260,7 +266,7 @@ export function GCodeViewer({
     };
 
     loadGCode();
-  }, [printerId, filename, lowPoly]);
+  }, [printerId, filename, lowPoly, token]);
 
   // Update nozzle position from toolhead
   useEffect(() => {
@@ -304,17 +310,19 @@ export function GCodeViewer({
 export function GCodeThumbnail({
   printerId,
   filename,
+  token,
   className = '',
 }: {
   printerId: string;
   filename: string;
+  token: string;
   className?: string;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    if (!canvasRef.current) return;
+    if (!canvasRef.current || !token) return;
 
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
@@ -327,7 +335,11 @@ export function GCodeThumbnail({
     // Load and render simplified G-code
     const render = async () => {
       try {
-        const res = await fetch(`/api/gcode/${printerId}?filename=${encodeURIComponent(filename)}`);
+        const res = await fetch(`/api/gcode/${printerId}?filename=${encodeURIComponent(filename)}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
         if (!res.ok) return;
 
         const gcode = await res.text();
@@ -382,7 +394,7 @@ export function GCodeThumbnail({
     };
 
     render();
-  }, [printerId, filename]);
+  }, [printerId, filename, token]);
 
   return (
     <canvas
