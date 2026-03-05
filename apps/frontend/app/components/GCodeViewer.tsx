@@ -284,8 +284,17 @@ export function GCodeViewer({
         }
 
         // Create geometry for G-code paths
+        // G-code coords: X/Y plane, Z up. Three.js: X/Z plane, Y up.
+        // Map (x, y, z) -> (x, z, y)
+        const pos3 = new Float32Array(positions.length);
+        for (let i = 0; i < positions.length; i += 3) {
+          pos3[i] = positions[i];
+          pos3[i + 1] = positions[i + 2];
+          pos3[i + 2] = positions[i + 1];
+        }
+
         const geometry = new THREE.BufferGeometry();
-        geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        geometry.setAttribute('position', new THREE.BufferAttribute(pos3, 3));
         geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
         const material = new THREE.LineBasicMaterial({
@@ -304,14 +313,30 @@ export function GCodeViewer({
         layerDataRef.current = layerData;
         setLayerCount(layerData.length);
 
-        // Center camera on model
+        // Center camera on model + fit to bounds
         geometry.computeBoundingBox();
         const bbox = geometry.boundingBox;
-        if (bbox) {
+        if (bbox && cameraRef.current && controlsRef.current) {
           const center = new THREE.Vector3();
+          const size = new THREE.Vector3();
           bbox.getCenter(center);
-          controlsRef.current?.target.copy(center);
-          cameraRef.current?.lookAt(center);
+          bbox.getSize(size);
+
+          controlsRef.current.target.copy(center);
+
+          const maxDim = Math.max(size.x, size.y, size.z);
+          const fov = (cameraRef.current.fov * Math.PI) / 180;
+          const dist = (maxDim / 2) / Math.tan(fov / 2);
+
+          cameraRef.current.near = Math.max(0.1, dist / 100);
+          cameraRef.current.far = Math.max(2000, dist * 100);
+          cameraRef.current.updateProjectionMatrix();
+
+          const dir = new THREE.Vector3(1, 1, 1).normalize();
+          cameraRef.current.position.copy(center).add(dir.multiplyScalar(dist * 1.4));
+          cameraRef.current.lookAt(center);
+
+          controlsRef.current.update();
         }
 
         setLoading(false);
@@ -506,7 +531,7 @@ export function GCodeThumbnail({
 
         if (positions.length === 0) return;
 
-        // Find bounds
+        // Find bounds in XY plane (top-down)
         let minX = Infinity, maxX = -Infinity;
         let minY = Infinity, maxY = -Infinity;
         let minZ = Infinity, maxZ = -Infinity;
@@ -537,9 +562,9 @@ export function GCodeThumbnail({
 
         for (let i = 0; i < positions.length; i += 6) {
           const x1 = (positions[i] - minX) * scale + (canvas.width - rangeX * scale) / 2;
-          const y1 = canvas.height - ((positions[i + 2] - minZ) * scale + (canvas.height - rangeY * scale) / 2);
+          const y1 = canvas.height - ((positions[i + 1] - minY) * scale + (canvas.height - rangeY * scale) / 2);
           const x2 = (positions[i + 3] - minX) * scale + (canvas.width - rangeX * scale) / 2;
-          const y2 = canvas.height - ((positions[i + 5] - minZ) * scale + (canvas.height - rangeY * scale) / 2);
+          const y2 = canvas.height - ((positions[i + 4] - minY) * scale + (canvas.height - rangeY * scale) / 2);
 
           ctx.moveTo(x1, y1);
           ctx.lineTo(x2, y2);
