@@ -102,6 +102,7 @@ export function GCodeViewer({
   const [simLayerPct, setSimLayerPct] = useState(100);
   const [ready, setReady] = useState(false);
   const [userInteracted, setUserInteracted] = useState(false);
+  const [containerSize, setContainerSize] = useState({ w: 0, h: 0 });
 
   const derivedLayer = useMemo(() => {
     const total = Math.max(1, totalLayers ?? layerCount);
@@ -131,6 +132,8 @@ export function GCodeViewer({
       if (!r) return;
       const w = Math.max(10, el.clientWidth);
       const h = Math.max(10, el.clientHeight);
+      if (w === containerSize.w && h === containerSize.h) return;
+      setContainerSize({ w, h });
       try {
         r.resize(w, h);
       } catch {
@@ -225,14 +228,20 @@ export function GCodeViewer({
     window.visualViewport?.addEventListener('resize', onResize);
     window.visualViewport?.addEventListener('scroll', onResize);
 
+    // Telegram Mini App viewport handling
+    const tg = (window as any).Telegram?.WebApp;
+    const onTgViewport = () => onResize();
+    tg?.onEvent?.('viewportChanged', onTgViewport);
+
     return () => {
       disposed = true;
       ro.disconnect();
       window.removeEventListener('resize', onResize);
       window.visualViewport?.removeEventListener('resize', onResize);
       window.visualViewport?.removeEventListener('scroll', onResize);
+      tg?.offEvent?.('viewportChanged', onTgViewport);
     };
-  }, [filename, lowPoly, printerId, token]);
+  }, [filename, lowPoly, printerId, token, containerSize.w, containerSize.h]);
 
   // Apply slicing based on slider state
   useEffect(() => {
@@ -296,55 +305,53 @@ export function GCodeViewer({
 
       {showProgress && layerCount > 0 && (
         <>
-          <div className="absolute right-2 top-2 bottom-12 w-6 flex flex-col items-center">
-            <div className="text-[9px] text-textMuted mb-1">Layer</div>
-            <div className="flex-1 w-2 rounded-full bg-surface2 relative overflow-hidden">
+          {/* Vertical layer slider - minimalist */}
+          <div className="absolute right-3 top-3 bottom-14 w-1.5 flex flex-col items-center">
+            <div className="flex-1 w-full rounded-full bg-surface2/60 relative overflow-hidden">
               <div
-                className="absolute bottom-0 left-0 right-0 bg-accentCyan/70 rounded-full transition-all"
+                className="absolute bottom-0 left-0 right-0 bg-accentCyan rounded-full transition-all duration-150"
                 style={{ height: `${((displayLayer + 1) / total) * 100}%` }}
               />
+              <input
+                type="range"
+                min={0}
+                max={Math.max(0, layerCount - 1)}
+                value={simLayer}
+                onChange={(e) => {
+                  setUserInteracted(true);
+                  setSimLayer(parseInt(e.target.value));
+                }}
+                className="absolute inset-0 opacity-0 cursor-pointer w-0.5"
+                style={{ writingMode: 'vertical-lr', direction: 'rtl' }}
+              />
             </div>
-            <input
-              type="range"
-              min={0}
-              max={Math.max(0, layerCount - 1)}
-              value={simLayer}
-              onChange={(e) => {
-                setUserInteracted(true);
-                setSimLayer(parseInt(e.target.value));
-              }}
-              className="absolute inset-0 opacity-0 cursor-pointer"
-              style={{ writingMode: 'vertical-lr', direction: 'rtl' }}
-            />
-            <div className="text-[9px] text-textMuted mt-1">
+            <div className="mt-2 text-[10px] font-medium text-textMuted">
               {displayLayer + 1}/{total}
             </div>
           </div>
 
-          <div className="absolute bottom-2 left-2 right-10">
-            <div className="flex items-center gap-2">
-              <span className="text-[9px] text-textMuted w-12">Layer</span>
-              <div className="flex-1 h-1.5 rounded-full bg-surface2 relative">
-                <div
-                  className="absolute left-0 top-0 bottom-0 rounded-full bg-accentCyan transition-all"
-                  style={{ width: `${simLayerPct}%` }}
-                />
-                <input
-                  type="range"
-                  min={0}
-                  max={100}
-                  value={simLayerPct}
-                  onChange={(e) => {
-                    setUserInteracted(true);
-                    setSimLayerPct(parseInt(e.target.value));
-                  }}
-                  className="absolute inset-0 opacity-0 cursor-pointer w-full"
-                />
-              </div>
-              <span className="text-[10px] text-textMuted w-12 text-right">
-                {`${simLayerPct}%`}
-              </span>
+          {/* Horizontal progress slider - minimalist */}
+          <div className="absolute bottom-3 left-3 right-10 flex items-center gap-2">
+            <div className="flex-1 h-1 rounded-full bg-surface2/60 relative overflow-hidden">
+              <div
+                className="absolute left-0 top-0 bottom-0 rounded-full bg-accentCyan transition-all duration-150"
+                style={{ width: `${simLayerPct}%` }}
+              />
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={simLayerPct}
+                onChange={(e) => {
+                  setUserInteracted(true);
+                  setSimLayerPct(parseInt(e.target.value));
+                }}
+                className="absolute inset-0 opacity-0 cursor-pointer w-full"
+              />
             </div>
+            <span className="text-[10px] font-medium text-textMuted min-w-[32px] text-right">
+              {simLayerPct}%
+            </span>
           </div>
         </>
       )}
