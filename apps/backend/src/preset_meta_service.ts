@@ -34,6 +34,12 @@ type MetadataResponse = {
   filament_name?: string;
 };
 
+type EmbeddedThumb = {
+  width: number;
+  height: number;
+  bytes: Buffer;
+};
+
 function pickBestThumbnail(
   thumbnails: ThumbnailDetails[],
 ): ThumbnailDetails | null {
@@ -64,6 +70,85 @@ function normalizeMoonrakerThumbPath(raw: string): string {
     .trim()
     .replace(/^\/+/, '')
     .replace(/^gcodes\/+/, '');
+}
+
+function isSafeRelPath(p: string): boolean {
+  const s = String(p ?? '').trim();
+  if (!s) return false;
+  if (s.includes('..')) return false;
+  if (s.includes('\\')) return false;
+  if (s.startsWith('/')) return false;
+  return true;
+}
+
+function extractEmbeddedThumbnailsFromGcode(
+  gcodeBytes: Buffer,
+): EmbeddedThumb[] {
+  const text = gcodeBytes.toString('utf8');
+  const lines = text.split(/\r?\n/);
+
+  const thumbs: EmbeddedThumb[] = [];
+  let i = 0;
+
+  while (i < lines.length) {
+    const line = lines[i];
+    const m = line.match(/^;\s*thumbnail\s+begin\s+(\d+)x(\d+)\s+(\d+)\s*$/i);
+    if (!m) {
+      i += 1;
+      continue;
+    }
+
+    const width = Number(m[1]);
+    const height = Number(m[2]);
+    if (
+      !Number.isFinite(width) ||
+      !Number.isFinite(height) ||
+      width <= 0 ||
+      height <= 0
+    ) {
+      i += 1;
+      continue;
+    }
+
+    i += 1;
+    let b64 = '';
+    while (i < lines.length) {
+      const l = lines[i];
+      if (/^;\s*thumbnail\s+end\s*$/i.test(l)) break;
+
+      const chunk = l.replace(/^;\s?/, '').trim();
+      if (chunk) b64 += chunk;
+      i += 1;
+    }
+
+    while (i < lines.length && !/^;\s*thumbnail\s+end\s*$/i.test(lines[i]))
+      i += 1;
+    if (i < lines.length) i += 1;
+
+    if (!b64) continue;
+    try {
+      const bytes = Buffer.from(b64, 'base64');
+      if (bytes.length > 0) thumbs.push({ width, height, bytes });
+    } catch {
+      continue;
+    }
+  }
+
+  return thumbs;
+}
+
+function pickBestEmbeddedThumb(thumbs: EmbeddedThumb[]): EmbeddedThumb | null {
+  if (thumbs.length === 0) return null;
+  let best = thumbs[0];
+  let bestArea = best.width * best.height;
+  for (const t of thumbs.slice(1)) {
+    const area = t.width * t.height;
+    if (area > bestArea) {
+      best = t;
+      bestArea = area;
+    }
+  }
+  return best;
 }
 
 export class PresetMetaService {
@@ -138,56 +223,84 @@ export class PresetMetaService {
     let thumbRel: string | null = null;
 
     if (shouldFetchThumb) {
-      const best = pickBestThumbnail(thumbs);
-      if (!best) {
-        logger.warn(
-          { presetId: input.presetId, remoteFilename: input.remoteFilename },
-          'moonraker thumbnails missing',
-        );
-      }
-      const bestPath = best
-        ? typeof (best as any).relative_path === 'string' &&
-          String((best as any).relative_path).trim()
-          ? String((best as any).relative_path)
-          : typeof best.thumbnail_path === 'string' && best.thumbnail_path
-            ? best.thumbnail_path
-            : null
-        : null;
-
-      if (best && bestPath) {
-        const thumbPath = normalizeMoonrakerThumbPath(bestPath);
-        let bytes: Buffer;
-        try {
-          bytes = await input.http.downloadFile({
-            root: 'gcodes',
-            filename: thumbPath,
-          });
-        } catch (e) {
-          const msg = e instanceof Error ? e.message : String(e);
-          logger.warn(
-            {
-              presetId: input.presetId,
-              remoteFilename: input.remoteFilename,
-              thumbPath,
-              err: msg,
-            },
-            'moonraker thumbnail download failed',
-          );
-          bytes = Buffer.from('');
+      try {
+        if (isSafeRelPath(preset.gcodePath)) {
+          const gcodeAbs = resolveFilesDirSafe(preset.gcodePath);
+          if (fs.existsSync(gcodeAbs)) {
+            const gcodeBytes = fs.readFileSync(gcodeAbs);
+            const embedded = extractEmbeddedThumbnailsFromGcode(gcodeBytes);
+            const bestEmbedded = pickBestEmbeddedThumb(embedded);
+            if (bestEmbedded && bestEmbedded.bytes.length > 0) {
+              const outRel = path.posix.join(
+                'presets',
+                input.presetId,
+                'thumb.png',
+              );
+              const outAbs = resolveFilesDirSafe(outRel);
+              ensureDir(path.dirname(outAbs));
+              fs.writeFileSync(outAbs, bestEmbedded.bytes);
+              thumbRel = outRel;
+            }
+          }
         }
+      } catch {
+        // ignore
+      }
 
-        if (bytes.length === 0) {
-          // keep thumbRel null
-        } else {
-          const outRel = path.posix.join(
-            'presets',
-            input.presetId,
-            'thumb.png',
+      if (thumbRel) {
+        // extracted from local gcode; skip moonraker thumbnail fetch
+      } else {
+        const best = pickBestThumbnail(thumbs);
+        if (!best) {
+          logger.warn(
+            { presetId: input.presetId, remoteFilename: input.remoteFilename },
+            'moonraker thumbnails missing',
           );
-          const outAbs = resolveFilesDirSafe(outRel);
-          ensureDir(path.dirname(outAbs));
-          fs.writeFileSync(outAbs, bytes);
-          thumbRel = outRel;
+        }
+        const bestPath = best
+          ? typeof (best as any).relative_path === 'string' &&
+            String((best as any).relative_path).trim()
+            ? String((best as any).relative_path)
+            : typeof best.thumbnail_path === 'string' && best.thumbnail_path
+              ? best.thumbnail_path
+              : null
+          : null;
+
+        if (best && bestPath) {
+          const thumbPath = normalizeMoonrakerThumbPath(bestPath);
+          let bytes: Buffer;
+          try {
+            bytes = await input.http.downloadFile({
+              root: 'gcodes',
+              filename: thumbPath,
+            });
+          } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e);
+            logger.warn(
+              {
+                presetId: input.presetId,
+                remoteFilename: input.remoteFilename,
+                thumbPath,
+                err: msg,
+              },
+              'moonraker thumbnail download failed',
+            );
+            bytes = Buffer.from('');
+          }
+
+          if (bytes.length === 0) {
+            // keep thumbRel null
+          } else {
+            const outRel = path.posix.join(
+              'presets',
+              input.presetId,
+              'thumb.png',
+            );
+            const outAbs = resolveFilesDirSafe(outRel);
+            ensureDir(path.dirname(outAbs));
+            fs.writeFileSync(outAbs, bytes);
+            thumbRel = outRel;
+          }
         }
       }
     }

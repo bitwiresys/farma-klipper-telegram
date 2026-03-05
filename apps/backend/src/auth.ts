@@ -36,8 +36,6 @@ function isProtectedApiRoute(method: string, pathname: string): boolean {
   if (m === 'GET' && /^\/api\/presets\/[^/]+$/.test(pathname)) return true;
   if (m === 'PATCH' && /^\/api\/presets\/[^/]+$/.test(pathname)) return true;
   if (m === 'DELETE' && /^\/api\/presets\/[^/]+$/.test(pathname)) return true;
-  if (m === 'GET' && /^\/api\/presets\/[^/]+\/thumbnail$/.test(pathname))
-    return true;
   if (m === 'POST' && /^\/api\/presets\/[^/]+\/print$/.test(pathname))
     return true;
 
