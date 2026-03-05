@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 
-import { Download, Filter } from 'lucide-react';
+import { Download, Filter, Box } from 'lucide-react';
 
 import type { PrintHistoryDto, PrinterDto } from '../lib/dto';
 
@@ -10,6 +10,7 @@ import { BottomSheet } from '../components/ui/BottomSheet';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Chip } from '../components/ui/Chip';
+import { GCodeThumbnail } from '../components/GCodeViewer';
 import { useAuth } from '../auth/auth_context';
 import { getBackendBaseUrl } from '../lib/env';
 import { buildPrinterLabelById } from '../lib/printer_label';
@@ -451,6 +452,18 @@ export default function HistoryPage() {
                 >
                   Open printer
                 </Button>
+                {active.filename && (
+                  <Button
+                    className="w-full"
+                    variant="secondary"
+                    onClick={() => {
+                      window.location.href = `/printers/${active.printerId}/3d?filename=${encodeURIComponent(active.filename)}`;
+                    }}
+                  >
+                    <Box size={14} className="mr-1.5" />
+                    View 3D G-code
+                  </Button>
+                )}
               </div>
             )}
           </BottomSheet>

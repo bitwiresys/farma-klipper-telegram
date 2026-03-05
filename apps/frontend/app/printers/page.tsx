@@ -14,6 +14,7 @@ import { EmptyState } from '../components/ui/EmptyState';
 import { InsetStat } from '../components/ui/InsetStat';
 import { ProgressBar } from '../components/ui/ProgressBar';
 import { StatusPill } from '../components/ui/StatusPill';
+import { GCodeThumbnail } from '../components/GCodeViewer';
 import { useAuth } from '../auth/auth_context';
 import { apiRequest, tryParseApiErrorBody, type ApiError } from '../lib/api';
 import { buildPrinterLabelById } from '../lib/printer_label';
@@ -312,6 +313,18 @@ export default function PrintersPage() {
                         <StatusPill state={state} />
                       </div>
                     </div>
+
+                    {/* G-code thumbnail */}
+                    {(state === 'printing' || state === 'paused') && filename && (
+                      <div className="mt-3">
+                        <GCodeThumbnail
+                          printerId={p.id}
+                          filename={filename}
+                          token={token ?? ''}
+                          className="h-[60px] w-full rounded-btn object-cover"
+                        />
+                      </div>
+                    )}
 
                   <div className="mt-3 flex items-end justify-between gap-3">
                     <div className="text-[28px] font-semibold leading-none text-textPrimary">
