@@ -15,101 +15,113 @@ type GCodeViewerProps = {
   currentLayer?: number | null;
   totalLayers?: number | null;
   className?: string;
-  lowPoly?: boolean; // For mobile optimization
+  lowPoly?: boolean;
+  simulationMode?: boolean; // Enable interactive sliders
 };
 
-// Simple G-code parser for basic visualization
-function parseGCode(gcode: string, lowPoly: boolean): { positions: Float32Array; colors: Float32Array; layerZ: number[]; layerPositions: Map<number, { start: number; end: number }> } {
+// G-code parser with proper extrusion detection
+function parseGCode(gcode: string): {
+  positions: Float32Array;
+  colors: Float32Array;
+  layerData: { z: number; startVertex: number; endVertex: number }[];
+} {
   const positions: number[] = [];
   const colors: number[] = [];
-  const layerZ: number[] = [];
-  const layerPositions = new Map<number, { start: number; end: number }>();
+  const layerData: { z: number; startVertex: number; endVertex: number }[] = [];
 
   let x = 0, y = 0, z = 0;
-  let prevZ = 0;
-  let prevE = 0; // Track absolute E position
-  let currentLayer = 0;
+  let lastZ = -Infinity;
+  let lastE = 0;
+  let absoluteE = true; // M82 default
+  let currentLayerIdx = -1;
   let vertexCount = 0;
 
   const lines = gcode.split('\n');
 
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (trimmed.startsWith(';')) continue;
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith(';')) continue;
 
-    const parts = trimmed.split(/\s+/);
+    const parts = line.split(/\s+/);
     const cmd = parts[0]?.toUpperCase();
 
-    if (cmd === 'G0' || cmd === 'G1') {
-      let newX = x, newY = y, newZ = z;
-      let eVal: number | null = null;
-      let isMove = false;
-
+    // Handle extruder mode
+    if (cmd === 'M82') { absoluteE = true; continue; }
+    if (cmd === 'M83') { absoluteE = false; continue; }
+    if (cmd === 'G92') {
+      // Set position - handle E reset
       for (const part of parts.slice(1)) {
-        const axis = part[0]?.toUpperCase();
-        const val = parseFloat(part.slice(1));
-        if (isNaN(val)) continue;
-
-        if (axis === 'X') { newX = val; isMove = true; }
-        else if (axis === 'Y') { newY = val; isMove = true; }
-        else if (axis === 'Z') { newZ = val; isMove = true; }
-        else if (axis === 'E') { eVal = val; }
-      }
-
-      // Detect layer change
-      if (newZ !== prevZ && newZ > prevZ) {
-        // Record end of previous layer
-        if (layerPositions.has(currentLayer)) {
-          const lp = layerPositions.get(currentLayer)!;
-          lp.end = vertexCount;
+        if (part.startsWith('E')) {
+          lastE = parseFloat(part.slice(1)) || 0;
         }
-        
-        layerZ.push(newZ);
-        prevZ = newZ;
-        currentLayer++;
-        
-        // Record start of new layer
-        layerPositions.set(currentLayer, { start: vertexCount, end: vertexCount });
       }
-
-      // Draw line if extruding (E changed)
-      const extruding = eVal !== null && eVal > prevE;
-      if (eVal !== null) prevE = eVal;
-
-      if (extruding && isMove) {
-        // Record layer start if first vertex
-        if (!layerPositions.has(currentLayer)) {
-          layerPositions.set(currentLayer, { start: vertexCount, end: vertexCount });
-        }
-        
-        // Add line vertices
-        positions.push(x, y, z, newX, newY, newZ);
-        vertexCount += 2;
-
-        // Color based on Z (gradient from bottom to top)
-        const t = currentLayer / Math.max(currentLayer + 1, 10);
-        const r = 0.2 + t * 0.3;
-        const g = 0.6 + t * 0.2;
-        const b = 0.8 - t * 0.3;
-
-        colors.push(r, g, b, r, g, b);
-        
-        // Update layer end
-        const lp = layerPositions.get(currentLayer);
-        if (lp) lp.end = vertexCount;
-      }
-
-      x = newX;
-      y = newY;
-      z = newZ;
+      continue;
     }
+
+    if (cmd !== 'G0' && cmd !== 'G1') continue;
+
+    let newX = x, newY = y, newZ = z;
+    let eVal: number | null = null;
+
+    for (const part of parts.slice(1)) {
+      const axis = part[0]?.toUpperCase();
+      const val = parseFloat(part.slice(1));
+      if (isNaN(val)) continue;
+
+      if (axis === 'X') newX = val;
+      else if (axis === 'Y') newY = val;
+      else if (axis === 'Z') newZ = val;
+      else if (axis === 'E') eVal = val;
+    }
+
+    // Detect layer change by Z increase
+    if (newZ > lastZ + 0.0001) {
+      // Close previous layer
+      if (currentLayerIdx >= 0 && layerData[currentLayerIdx]) {
+        layerData[currentLayerIdx].endVertex = vertexCount;
+      }
+      
+      currentLayerIdx++;
+      lastZ = newZ;
+      layerData.push({ z: newZ, startVertex: vertexCount, endVertex: vertexCount });
+    }
+
+    // Check extrusion
+    let isExtruding = false;
+    if (eVal !== null) {
+      const deltaE = absoluteE ? (eVal - lastE) : eVal;
+      isExtruding = deltaE > 0.0001;
+      lastE = absoluteE ? eVal : lastE + eVal;
+    }
+
+    // Only draw if extruding AND moving
+    if (isExtruding && (newX !== x || newY !== y || newZ !== z)) {
+      positions.push(x, y, z, newX, newY, newZ);
+      vertexCount += 2;
+
+      // Color: cyan gradient based on layer
+      const t = Math.min(currentLayerIdx / Math.max(layerData.length, 1), 1);
+      const r = 0.1 + t * 0.1;
+      const g = 0.7 + t * 0.2;
+      const b = 0.8 - t * 0.2;
+
+      colors.push(r, g, b, r, g, b);
+    }
+
+    x = newX;
+    y = newY;
+    z = newZ;
+  }
+
+  // Close last layer
+  if (currentLayerIdx >= 0 && layerData[currentLayerIdx]) {
+    layerData[currentLayerIdx].endVertex = vertexCount;
   }
 
   return {
     positions: new Float32Array(positions),
     colors: new Float32Array(colors),
-    layerZ,
-    layerPositions,
+    layerData,
   };
 }
 
@@ -125,6 +137,7 @@ export function GCodeViewer({
   totalLayers,
   className = '',
   lowPoly = false,
+  simulationMode = false,
 }: GCodeViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
@@ -134,10 +147,16 @@ export function GCodeViewer({
   const nozzleRef = useRef<THREE.Mesh | null>(null);
   const animationRef = useRef<number>(0);
   const linesRef = useRef<THREE.LineSegments | null>(null);
-  const layerZRef = useRef<number[]>([]);
+  const originalColorsRef = useRef<Float32Array | null>(null);
+  const layerDataRef = useRef<{ z: number; startVertex: number; endVertex: number }[]>([]);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [layerCount, setLayerCount] = useState(0);
+  
+  // Simulation state
+  const [simLayer, setSimLayer] = useState(0);
+  const [layerProgress, setLayerProgress] = useState(100);
 
   // Initialize Three.js scene
   useEffect(() => {
@@ -188,17 +207,6 @@ export function GCodeViewer({
     // Build plate (grid)
     const gridHelper = new THREE.GridHelper(250, 25, 0x20d3c2, 0x1a1a2e);
     scene.add(gridHelper);
-
-    // Build plate border
-    const plateGeometry = new THREE.BoxGeometry(250, 1, 250);
-    const plateMaterial = new THREE.MeshBasicMaterial({
-      color: 0x1a1a2e,
-      transparent: true,
-      opacity: 0.3,
-    });
-    const plate = new THREE.Mesh(plateGeometry, plateMaterial);
-    plate.position.set(0, -0.5, 0);
-    scene.add(plate);
 
     // Nozzle indicator
     if (showNozzle) {
@@ -253,14 +261,20 @@ export function GCodeViewer({
           },
         });
         if (!res.ok) {
-          throw new Error(`Failed to load G-code: ${res.status}`);
+          const errText = await res.text().catch(() => '');
+          throw new Error(`Failed to load G-code: ${res.status} ${errText.slice(0, 100)}`);
         }
 
         const gcode = await res.text();
-        const { positions, colors, layerZ, layerPositions } = parseGCode(gcode, lowPoly);
+        
+        if (!gcode || gcode.length < 10) {
+          throw new Error('Empty or invalid G-code file');
+        }
+
+        const { positions, colors, layerData } = parseGCode(gcode);
 
         if (positions.length === 0) {
-          throw new Error('No valid G-code data found');
+          throw new Error('No extrusion moves found in G-code');
         }
 
         // Remove old lines if any
@@ -284,7 +298,11 @@ export function GCodeViewer({
         const lines = new THREE.LineSegments(geometry, material);
         sceneRef.current?.add(lines);
         linesRef.current = lines;
-        layerZRef.current = layerZ;
+        
+        // Store original colors for later manipulation
+        originalColorsRef.current = new Float32Array(colors);
+        layerDataRef.current = layerData;
+        setLayerCount(layerData.length);
 
         // Center camera on model
         geometry.computeBoundingBox();
@@ -305,51 +323,62 @@ export function GCodeViewer({
     };
 
     loadGCode();
-  }, [printerId, filename, lowPoly, token]);
+  }, [printerId, filename, token]);
 
-  // Update layer visibility based on progress
+  // Update layer visibility based on simulation or print progress
   useEffect(() => {
-    if (!linesRef.current || !layerZRef.current.length) return;
-    
-    const totalLayerCount = totalLayers ?? layerZRef.current.length;
-    const currentLayerNum = currentLayer ?? Math.floor((progress / 100) * totalLayerCount);
-    
-    // Update line opacity based on layer progress
+    if (!linesRef.current || !originalColorsRef.current || layerDataRef.current.length === 0) return;
+
     const geometry = linesRef.current.geometry;
-    const positionAttr = geometry.getAttribute('position');
     const colorAttr = geometry.getAttribute('color');
+    const positionAttr = geometry.getAttribute('position');
     
-    if (!positionAttr || !colorAttr) return;
+    if (!colorAttr || !positionAttr) return;
+
+    const totalLayerCount = totalLayers ?? layerDataRef.current.length;
     
-    // Find Z threshold for current layer
-    const zThreshold = layerZRef.current[Math.min(currentLayerNum, layerZRef.current.length - 1)] ?? Infinity;
+    // In simulation mode use simLayer, otherwise use currentLayer/progress
+    const targetLayer = simulationMode 
+      ? simLayer 
+      : (currentLayer ?? Math.floor((progress / 100) * totalLayerCount));
     
-    // Update colors: printed layers solid, future layers transparent
-    const colors = colorAttr.array as Float32Array;
+    const layerIdx = Math.min(Math.max(targetLayer, 0), layerDataRef.current.length - 1);
+    const currentLayerInfo = layerDataRef.current[layerIdx];
+    
+    // Get Z threshold for visibility
+    const zThreshold = currentLayerInfo?.z ?? Infinity;
+    
     const positions = positionAttr.array as Float32Array;
-    
+    const colors = colorAttr.array as Float32Array;
+    const originalColors = originalColorsRef.current;
+
+    // Reset all colors first
+    for (let i = 0; i < colors.length; i++) {
+      colors[i] = originalColors[i];
+    }
+
+    // Apply dimming to future layers
     for (let i = 0; i < positions.length; i += 6) {
       const z1 = positions[i + 2];
       const z2 = positions[i + 5];
       const avgZ = (z1 + z2) / 2;
       
-      const isPrinted = avgZ <= zThreshold;
-      const alpha = isPrinted ? 1.0 : 0.3;
+      const isPrinted = avgZ <= zThreshold + 0.01;
       
-      // Store alpha in 4th component if we had it, but LineBasicMaterial doesn't support per-vertex alpha
-      // So we dim the color instead
-      const dimFactor = isPrinted ? 1.0 : 0.4;
-      const baseIdx = (i / 3) * 3;
-      colors[baseIdx] = colors[baseIdx] * dimFactor;
-      colors[baseIdx + 1] = colors[baseIdx + 1] * dimFactor;
-      colors[baseIdx + 2] = colors[baseIdx + 2] * dimFactor;
-      colors[baseIdx + 3] = colors[baseIdx + 3] * dimFactor;
-      colors[baseIdx + 4] = colors[baseIdx + 4] * dimFactor;
-      colors[baseIdx + 5] = colors[baseIdx + 5] * dimFactor;
+      if (!isPrinted) {
+        // Dim future layers
+        const baseIdx = (i / 3) * 3;
+        colors[baseIdx] *= 0.3;
+        colors[baseIdx + 1] *= 0.3;
+        colors[baseIdx + 2] *= 0.3;
+        colors[baseIdx + 3] *= 0.3;
+        colors[baseIdx + 4] *= 0.3;
+        colors[baseIdx + 5] *= 0.3;
+      }
     }
-    
+
     colorAttr.needsUpdate = true;
-  }, [progress, currentLayer, totalLayers]);
+  }, [progress, currentLayer, totalLayers, simLayer, simulationMode]);
 
   // Update nozzle position from toolhead
   useEffect(() => {
@@ -358,6 +387,9 @@ export function GCodeViewer({
     const { x, y, z } = toolheadPosition;
     nozzleRef.current.position.set(x, z + 5, y); // Swap Y/Z for Three.js coords
   }, [toolheadPosition]);
+
+  const totalLayerCount = totalLayers ?? layerCount;
+  const displayLayer = simulationMode ? simLayer : (currentLayer ?? Math.floor((progress / 100) * totalLayerCount));
 
   return (
     <div className={`relative ${className}`}>
@@ -370,37 +402,62 @@ export function GCodeViewer({
       )}
 
       {error && (
-        <div className="absolute inset-0 flex items-center justify-center bg-bg/80">
-          <div className="text-red-400">{error}</div>
+        <div className="absolute inset-0 flex items-center justify-center bg-bg/80 p-4">
+          <div className="text-red-400 text-center text-sm">{error}</div>
         </div>
       )}
 
-      {/* Vertical layer progress bar (like slicers) */}
-      {showProgress && layerZRef.current.length > 0 && (
-        <div className="absolute right-2 top-2 bottom-10 w-4 flex flex-col justify-end overflow-hidden rounded bg-surface2/80">
-          <div
-            className="w-full bg-accentCyan/60 transition-all"
-            style={{
-              height: `${((currentLayer ?? Math.floor((progress / 100) * (totalLayers ?? layerZRef.current.length))) / (totalLayers ?? layerZRef.current.length)) * 100}%`,
-            }}
-          />
-          <div className="absolute bottom-1 left-0 right-0 text-center text-[9px] text-textMuted">
-            {currentLayer ?? Math.floor((progress / 100) * (totalLayers ?? layerZRef.current.length))}/{totalLayers ?? layerZRef.current.length}
+      {/* Vertical layer slider (simulation) - right side */}
+      {showProgress && layerCount > 0 && (
+        <div className="absolute right-2 top-2 bottom-12 w-6 flex flex-col items-center">
+          <div className="text-[9px] text-textMuted mb-1">Layer</div>
+          <div className="flex-1 w-2 rounded-full bg-surface2 relative overflow-hidden">
+            <div
+              className="absolute bottom-0 left-0 right-0 bg-accentCyan/70 rounded-full transition-all"
+              style={{
+                height: `${((displayLayer + 1) / totalLayerCount) * 100}%`,
+              }}
+            />
+          </div>
+          {simulationMode && (
+            <input
+              type="range"
+              min={0}
+              max={layerCount - 1}
+              value={simLayer}
+              onChange={(e) => setSimLayer(parseInt(e.target.value))}
+              className="absolute inset-0 opacity-0 cursor-pointer"
+              style={{ writingMode: 'vertical-lr', direction: 'rtl' }}
+            />
+          )}
+          <div className="text-[9px] text-textMuted mt-1">
+            {displayLayer + 1}/{totalLayerCount}
           </div>
         </div>
       )}
 
-      {/* Horizontal overall progress bar */}
+      {/* Horizontal layer progress slider - bottom */}
       {showProgress && (
-        <div className="absolute bottom-2 left-2 right-8">
+        <div className="absolute bottom-2 left-2 right-10">
           <div className="flex items-center gap-2">
-            <div className="flex-1 h-1.5 rounded-full bg-surface2">
+            <span className="text-[9px] text-textMuted w-12">Layer</span>
+            <div className="flex-1 h-1.5 rounded-full bg-surface2 relative">
               <div
-                className="h-full rounded-full bg-accentCyan transition-all"
-                style={{ width: `${progress}%` }}
+                className="absolute left-0 top-0 bottom-0 rounded-full bg-accentCyan transition-all"
+                style={{ width: `${((displayLayer + 1) / totalLayerCount) * 100}%` }}
               />
+              {simulationMode && (
+                <input
+                  type="range"
+                  min={0}
+                  max={layerCount - 1}
+                  value={simLayer}
+                  onChange={(e) => setSimLayer(parseInt(e.target.value))}
+                  className="absolute inset-0 opacity-0 cursor-pointer w-full"
+                />
+              )}
             </div>
-            <span className="text-[10px] text-textMuted w-8 text-right">{progress.toFixed(0)}%</span>
+            <span className="text-[10px] text-textMuted w-12 text-right">{progress.toFixed(0)}%</span>
           </div>
         </div>
       )}
@@ -445,7 +502,7 @@ export function GCodeThumbnail({
         if (!res.ok) return;
 
         const gcode = await res.text();
-        const { positions } = parseGCode(gcode, true);
+        const { positions } = parseGCode(gcode);
 
         if (positions.length === 0) return;
 
