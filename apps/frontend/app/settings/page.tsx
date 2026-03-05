@@ -83,15 +83,20 @@ export default function SettingsPage() {
   const [statusLoading, setStatusLoading] = useState(false);
   const [statusUpdatedAt, setStatusUpdatedAt] = useState<string | null>(null);
 
-  const frontendStatus = useMemo<FrontendStatus>(() => ({
-    version: '1.0.0',
-    gitCommit: getFrontendGitCommit(),
-  }), []);
+  const frontendStatus = useMemo<FrontendStatus>(
+    () => ({
+      version: '1.0.0',
+      gitCommit: getFrontendGitCommit(),
+    }),
+    [],
+  );
 
   const wsStatus = ws.status;
   const wsErrors = ws.errors;
 
-  const [apiErrors, setApiErrors] = useState<Array<{ message: string; timestamp: string }>>([]);
+  const [apiErrors, setApiErrors] = useState<
+    Array<{ message: string; timestamp: string }>
+  >([]);
 
   const [addUserOpen, setAddUserOpen] = useState(false);
   const [newTelegramId, setNewTelegramId] = useState('');
@@ -238,8 +243,16 @@ export default function SettingsPage() {
   useEffect(() => {
     const handler = (e: ErrorEvent) => {
       // Only track fetch errors
-      if (e.message && (e.message.includes('fetch') || e.message.includes('API'))) {
-        setApiErrors((prev) => [...prev, { message: e.message, timestamp: new Date().toISOString() }].slice(-10));
+      if (
+        e.message &&
+        (e.message.includes('fetch') || e.message.includes('API'))
+      ) {
+        setApiErrors((prev) =>
+          [
+            ...prev,
+            { message: e.message, timestamp: new Date().toISOString() },
+          ].slice(-10),
+        );
       }
     };
     window.addEventListener('error', handler);
@@ -455,9 +468,7 @@ export default function SettingsPage() {
       </Card>
 
       <Card className="p-3">
-        <div className="text-xs font-medium text-textPrimary">
-          Version info
-        </div>
+        <div className="text-xs font-medium text-textPrimary">Version info</div>
 
         <div className="mt-2 space-y-2 text-xs">
           <div className="flex items-center justify-between rounded-btn border border-border/45 bg-surface2/55 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
@@ -472,11 +483,13 @@ export default function SettingsPage() {
               {status?.gitCommit ?? '—'}
             </div>
           </div>
-          {status && frontendStatus.gitCommit !== status.gitCommit && frontendStatus.gitCommit !== 'dev' && (
-            <div className="rounded-btn border border-warning/30 bg-warning/10 p-2 text-[11px] text-textPrimary">
-              ⚠️ Version mismatch: frontend and backend may be out of sync.
-            </div>
-          )}
+          {status &&
+            frontendStatus.gitCommit !== status.gitCommit &&
+            frontendStatus.gitCommit !== 'dev' && (
+              <div className="rounded-btn border border-warning/30 bg-warning/10 p-2 text-[11px] text-textPrimary">
+                ⚠️ Version mismatch: frontend and backend may be out of sync.
+              </div>
+            )}
         </div>
       </Card>
 
@@ -560,25 +573,41 @@ export default function SettingsPage() {
           {wsErrors.length > 0 && (
             <div className="space-y-1">
               <div className="font-medium text-textPrimary">WebSocket</div>
-              {wsErrors.slice(-5).reverse().map((err, i) => (
-                <div key={i} className="rounded-btn border border-border/45 bg-surface2/55 p-2">
-                  <div className="text-textSecondary">{err.type}</div>
-                  <div className="mt-1 text-textPrimary">{err.message}</div>
-                  <div className="mt-1 text-textMuted">{new Date(err.timestamp).toLocaleTimeString()}</div>
-                </div>
-              ))}
+              {wsErrors
+                .slice(-5)
+                .reverse()
+                .map((err, i) => (
+                  <div
+                    key={i}
+                    className="rounded-btn border border-border/45 bg-surface2/55 p-2"
+                  >
+                    <div className="text-textSecondary">{err.type}</div>
+                    <div className="mt-1 text-textPrimary">{err.message}</div>
+                    <div className="mt-1 text-textMuted">
+                      {new Date(err.timestamp).toLocaleTimeString()}
+                    </div>
+                  </div>
+                ))}
             </div>
           )}
 
           {apiErrors.length > 0 && (
             <div className="space-y-1">
               <div className="font-medium text-textPrimary">API</div>
-              {apiErrors.slice(-5).reverse().map((err, i) => (
-                <div key={i} className="rounded-btn border border-border/45 bg-surface2/55 p-2">
-                  <div className="text-textPrimary">{err.message}</div>
-                  <div className="mt-1 text-textMuted">{new Date(err.timestamp).toLocaleTimeString()}</div>
-                </div>
-              ))}
+              {apiErrors
+                .slice(-5)
+                .reverse()
+                .map((err, i) => (
+                  <div
+                    key={i}
+                    className="rounded-btn border border-border/45 bg-surface2/55 p-2"
+                  >
+                    <div className="text-textPrimary">{err.message}</div>
+                    <div className="mt-1 text-textMuted">
+                      {new Date(err.timestamp).toLocaleTimeString()}
+                    </div>
+                  </div>
+                ))}
             </div>
           )}
         </div>

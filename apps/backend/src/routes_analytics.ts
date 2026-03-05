@@ -137,12 +137,10 @@ export async function registerAnalyticsRoutes(app: FastifyInstance) {
       }
     }
 
-    stats.successRate = stats.total > 0 
-      ? Math.round((stats.completed / stats.total) * 100) 
-      : 0;
-    stats.avgDurationSec = durationCount > 0 
-      ? Math.round(totalDuration / durationCount) 
-      : null;
+    stats.successRate =
+      stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0;
+    stats.avgDurationSec =
+      durationCount > 0 ? Math.round(totalDuration / durationCount) : null;
 
     return reply.send(stats);
   });
@@ -220,7 +218,10 @@ export async function registerAnalyticsRoutes(app: FastifyInstance) {
       },
     });
 
-    const byPrinter = new Map<string, { name: string; totalSec: number; printCount: number }>();
+    const byPrinter = new Map<
+      string,
+      { name: string; totalSec: number; printCount: number }
+    >();
 
     for (const h of history) {
       if (!byPrinter.has(h.printerId)) {
@@ -236,13 +237,14 @@ export async function registerAnalyticsRoutes(app: FastifyInstance) {
     }
 
     const result = Array.from(byPrinter.values())
-      .map(p => ({
+      .map((p) => ({
         name: p.name,
         totalHours: Math.round((p.totalSec / 3600) * 10) / 10,
         printCount: p.printCount,
-        avgPrintHours: p.printCount > 0 
-          ? Math.round((p.totalSec / p.printCount / 3600) * 10) / 10 
-          : 0,
+        avgPrintHours:
+          p.printCount > 0
+            ? Math.round((p.totalSec / p.printCount / 3600) * 10) / 10
+            : 0,
       }))
       .sort((a, b) => b.totalHours - a.totalHours);
 

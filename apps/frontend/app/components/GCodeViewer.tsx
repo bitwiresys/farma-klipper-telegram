@@ -7,59 +7,109 @@ function sanitizeGCode(input: string): string {
   // Remove non-standard lines that can contain huge numeric blobs (e.g. EXCLUDE_OBJECT_DEFINE)
   // and strip comments to keep the viewer parser stable.
   const out: string[] = [];
-  const lines = input.split(/\r?\n/);
-  for (const raw of lines) {
-    const line0 = raw.trim();
-    if (!line0) continue;
 
-    // Keep slicer layer markers as comments (viewer uses Z by default anyway)
-    if (line0.startsWith(';')) {
+  // Avoid `split()` on large files (embedded thumbnails can be huge and cause OOM in webviews).
+  // Process input line-by-line with minimal allocations.
+  const maxLineLen = 8_192;
+  const allowedCmds = new Set(['G0', 'G1', 'G90', 'G91', 'G92', 'M82', 'M83']);
+  const allowedParams = new Set(['X', 'Y', 'Z', 'E', 'F']);
+
+  let i = 0;
+  const n = input.length;
+  while (i < n) {
+    let j = input.indexOf('\n', i);
+    if (j === -1) j = n;
+
+    // Slice without trimming the whole line first.
+    let raw = input.slice(i, j);
+    if (raw.endsWith('\r')) raw = raw.slice(0, -1);
+
+    // Hard-drop extremely long lines (base64 blobs, macros, etc.).
+    if (raw.length > maxLineLen) {
+      i = j + 1;
       continue;
     }
 
-    // Remove inline comments
-    const semi = line0.indexOf(';');
-    const line = (semi >= 0 ? line0.slice(0, semi) : line0).trim();
-    if (!line) continue;
+    // Skip leading whitespace
+    let s = 0;
+    while (s < raw.length) {
+      const c = raw.charCodeAt(s);
+      if (c !== 32 && c !== 9) break;
+      s++;
+    }
+    if (s >= raw.length) {
+      i = j + 1;
+      continue;
+    }
+
+    // Skip full-line comments
+    if (raw[s] === ';') {
+      i = j + 1;
+      continue;
+    }
+
+    // Remove inline comments (everything after ';')
+    const semi = raw.indexOf(';', s);
+    const line = (semi >= 0 ? raw.slice(s, semi) : raw.slice(s)).trim();
+    if (!line) {
+      i = j + 1;
+      continue;
+    }
 
     // Drop any lines that already contain NaN/Infinity tokens.
-    if (/(^|[^a-z])(nan|inf|infinity)([^a-z]|$)/i.test(line)) continue;
+    if (/(^|[^a-z])(nan|inf|infinity)([^a-z]|$)/i.test(line)) {
+      i = j + 1;
+      continue;
+    }
 
     // Accept only a strict, safe subset of commands.
     // This drops custom macros that can contain non-numeric blobs or unsupported parameters.
     const cmdMatch = /^([GMT])(\d+)\b/i.exec(line);
-    if (!cmdMatch) continue;
+    if (!cmdMatch) {
+      i = j + 1;
+      continue;
+    }
     const cmdLetter = cmdMatch[1].toUpperCase();
     const cmdNum = Number(cmdMatch[2]);
     const cmdKey = `${cmdLetter}${cmdNum}`;
-    const allowedCmds = new Set(['G0', 'G1', 'G90', 'G91', 'G92', 'M82', 'M83']);
-    if (!allowedCmds.has(cmdKey)) continue;
+    if (!allowedCmds.has(cmdKey)) {
+      i = j + 1;
+      continue;
+    }
 
     // Strip invalid numeric params (e.g. Xnan, Yinf, X, X-)
     // Keep only XYZEF (the viewer's geometry depends on these).
-    const allowedParams = new Set(['X', 'Y', 'Z', 'E', 'F']);
     const parts = line.split(/\s+/);
     const cmd = parts[0].toUpperCase();
     const cleaned: string[] = [cmd];
     let keptParams = 0;
-    for (let i = 1; i < parts.length; i++) {
-      const p = parts[i];
+    for (let k = 1; k < parts.length; k++) {
+      const p = parts[k];
       if (!p) continue;
-      const m = /^([A-Za-z])([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)$/.exec(p);
+      const m =
+        /^([A-Za-z])([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)$/.exec(p);
       if (!m) continue;
-      const k = m[1].toUpperCase();
-      if (!allowedParams.has(k)) continue;
+      const key = m[1].toUpperCase();
+      if (!allowedParams.has(key)) continue;
       const v = Number(m[2]);
       if (!Number.isFinite(v)) continue;
-      cleaned.push(`${k}${m[2]}`);
+      cleaned.push(`${key}${m[2]}`);
       keptParams++;
     }
 
     // Drop empty motion commands (can confuse some parsers)
-    if ((cmdKey === 'G0' || cmdKey === 'G1' || cmdKey === 'G92') && keptParams === 0) continue;
+    if (
+      (cmdKey === 'G0' || cmdKey === 'G1' || cmdKey === 'G92') &&
+      keptParams === 0
+    ) {
+      i = j + 1;
+      continue;
+    }
 
     out.push(cleaned.join(' '));
+    i = j + 1;
   }
+
   return out.join('\n');
 }
 
@@ -92,7 +142,6 @@ export function GCodeViewer({
   lowPoly = false,
   simulationMode = false,
 }: GCodeViewerProps) {
-
   const containerRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<GCodeRenderer | null>(null);
   const [loading, setLoading] = useState(true);
@@ -169,7 +218,9 @@ export function GCodeViewer({
         );
         if (!res.ok) {
           const t = await res.text().catch(() => '');
-          throw new Error(`Failed to load G-code: ${res.status} ${t.slice(0, 120)}`);
+          throw new Error(
+            `Failed to load G-code: ${res.status} ${t.slice(0, 120)}`,
+          );
         }
 
         const gcodeStringRaw = await res.text();
@@ -191,7 +242,12 @@ export function GCodeViewer({
         const width = Math.max(10, el.clientWidth);
         const height = Math.max(10, el.clientHeight);
 
-        const r = new GCodeRenderer(gcodeString, width, height, new Color(0x0b0f14));
+        const r = new GCodeRenderer(
+          gcodeString,
+          width,
+          height,
+          new Color(0x0b0f14),
+        );
         r.radialSegments = lowPoly ? 3 : 6;
         r.travelWidth = lowPoly ? 0.015 : 0.01;
 
@@ -200,26 +256,27 @@ export function GCodeViewer({
         rendererRef.current = r;
 
         // Override fitCamera to properly scale model to viewport
-        (r as any).fitCamera = function() {
+        (r as any).fitCamera = function () {
           const parser = this.parser;
           if (!parser.min || !parser.max) return;
-          
+
           const sizeX = parser.max.x - parser.min.x;
           const sizeY = parser.max.y - parser.min.y;
           const sizeZ = parser.max.z - parser.min.z;
           const maxDim = Math.max(sizeX, sizeY, sizeZ);
-          
+
           const fov = this.camera.fov || 75;
-          const cameraDistance = (maxDim / 2) / Math.tan((fov * Math.PI / 360)) * 1.3;
-          
+          const cameraDistance =
+            (maxDim / 2 / Math.tan((fov * Math.PI) / 360)) * 1.3;
+
           const centerX = (parser.min.x + parser.max.x) / 2;
           const centerY = (parser.min.y + parser.max.y) / 2;
           const centerZ = (parser.min.z + parser.max.z) / 2;
-          
+
           this.camera.position.x = centerX;
           this.camera.position.y = centerY - cameraDistance * 0.4;
           this.camera.position.z = parser.max.z + cameraDistance * 0.6;
-          
+
           if (this.cameraControl) {
             this.cameraControl.target.set(centerX, centerY, centerZ);
           }
@@ -232,8 +289,12 @@ export function GCodeViewer({
 
         scheduleResize();
 
-        const defs = r.getLayerDefinitionsNoCopy?.() ?? r.getLayerDefinitions?.() ?? [];
-        const lc = Math.max(0, r.layerCount?.() ?? (Array.isArray(defs) ? defs.length : 0));
+        const defs =
+          r.getLayerDefinitionsNoCopy?.() ?? r.getLayerDefinitions?.() ?? [];
+        const lc = Math.max(
+          0,
+          r.layerCount?.() ?? (Array.isArray(defs) ? defs.length : 0),
+        );
         setLayerCount(lc);
         setSimLayer((x) => {
           if (lc <= 0) return 0;

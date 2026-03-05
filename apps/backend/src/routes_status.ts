@@ -22,7 +22,10 @@ let cachedGitCommit: string | null = null;
 function getGitCommit(): string {
   if (cachedGitCommit !== null) return cachedGitCommit;
   try {
-    const hash = execSync('git rev-parse HEAD', { encoding: 'utf8', timeout: 2000 }).trim();
+    const hash = execSync('git rev-parse HEAD', {
+      encoding: 'utf8',
+      timeout: 2000,
+    }).trim();
     cachedGitCommit = hash.slice(0, 7);
     return cachedGitCommit;
   } catch {

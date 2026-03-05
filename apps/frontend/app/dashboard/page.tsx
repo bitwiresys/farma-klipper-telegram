@@ -87,19 +87,22 @@ export default function DashboardPage() {
   }, [printers]);
 
   // Group action helpers
-  const printingPrinters = useMemo(() => 
-    printers.filter(p => p.snapshot.state === 'printing'), 
-    [printers]
+  const printingPrinters = useMemo(
+    () => printers.filter((p) => p.snapshot.state === 'printing'),
+    [printers],
   );
-  
-  const pausedPrinters = useMemo(() => 
-    printers.filter(p => p.snapshot.state === 'paused'), 
-    [printers]
+
+  const pausedPrinters = useMemo(
+    () => printers.filter((p) => p.snapshot.state === 'paused'),
+    [printers],
   );
-  
-  const activePrinters = useMemo(() => 
-    printers.filter(p => p.snapshot.state === 'printing' || p.snapshot.state === 'paused'),
-    [printers]
+
+  const activePrinters = useMemo(
+    () =>
+      printers.filter(
+        (p) => p.snapshot.state === 'printing' || p.snapshot.state === 'paused',
+      ),
+    [printers],
   );
 
   const pause = async (printerId: string) => {
@@ -176,25 +179,40 @@ export default function DashboardPage() {
   const groupPause = async () => {
     if (!token) return;
     setErr(null);
-    await Promise.all(printingPrinters.map(p => 
-      apiRequest(`/api/printers/${p.id}/pause`, { token, method: 'POST' }).catch(() => {})
-    ));
+    await Promise.all(
+      printingPrinters.map((p) =>
+        apiRequest(`/api/printers/${p.id}/pause`, {
+          token,
+          method: 'POST',
+        }).catch(() => {}),
+      ),
+    );
   };
 
   const groupResume = async () => {
     if (!token) return;
     setErr(null);
-    await Promise.all(pausedPrinters.map(p => 
-      apiRequest(`/api/printers/${p.id}/resume`, { token, method: 'POST' }).catch(() => {})
-    ));
+    await Promise.all(
+      pausedPrinters.map((p) =>
+        apiRequest(`/api/printers/${p.id}/resume`, {
+          token,
+          method: 'POST',
+        }).catch(() => {}),
+      ),
+    );
   };
 
   const groupCancel = async () => {
     if (!token) return;
     setErr(null);
-    await Promise.all(activePrinters.map(p => 
-      apiRequest(`/api/printers/${p.id}/cancel`, { token, method: 'POST' }).catch(() => {})
-    ));
+    await Promise.all(
+      activePrinters.map((p) =>
+        apiRequest(`/api/printers/${p.id}/cancel`, {
+          token,
+          method: 'POST',
+        }).catch(() => {}),
+      ),
+    );
   };
 
   useEffect(() => {
@@ -263,7 +281,13 @@ export default function DashboardPage() {
             <Button
               variant="secondary"
               className="px-2 py-1 text-[10px]"
-              onClick={() => setGroupActionConfirm({ open: true, action: 'pause', count: printingPrinters.length })}
+              onClick={() =>
+                setGroupActionConfirm({
+                  open: true,
+                  action: 'pause',
+                  count: printingPrinters.length,
+                })
+              }
             >
               <Pause size={12} className="mr-1" />
               Pause all
@@ -273,7 +297,13 @@ export default function DashboardPage() {
             <Button
               variant="secondary"
               className="px-2 py-1 text-[10px]"
-              onClick={() => setGroupActionConfirm({ open: true, action: 'resume', count: pausedPrinters.length })}
+              onClick={() =>
+                setGroupActionConfirm({
+                  open: true,
+                  action: 'resume',
+                  count: pausedPrinters.length,
+                })
+              }
             >
               <Play size={12} className="mr-1" />
               Resume all
@@ -282,7 +312,13 @@ export default function DashboardPage() {
           <Button
             variant="secondary"
             className="px-2 py-1 text-[10px]"
-            onClick={() => setGroupActionConfirm({ open: true, action: 'cancel', count: activePrinters.length })}
+            onClick={() =>
+              setGroupActionConfirm({
+                open: true,
+                action: 'cancel',
+                count: activePrinters.length,
+              })
+            }
           >
             <XCircle size={12} className="mr-1" />
             Cancel all
@@ -294,140 +330,156 @@ export default function DashboardPage() {
         {viewMode === 'cards' ? (
           // Card view (existing)
           printers.map((p) => {
-          const st = p.snapshot.state;
-          const showActions =
-            st === 'printing' || st === 'paused' || st === 'error';
-          const filename =
-            st === 'standby'
-              ? '—'
-              : (p.snapshot.jobLabel ?? p.snapshot.filename ?? '—');
-          return (
-            <Card
-              key={p.id}
-              className={st === 'error' ? 'border-danger/40' : ''}
-            >
-              <div className="flex items-start justify-between gap-3">
-                <Link href={`/printers?focus=${encodeURIComponent(p.id)}`} className="block min-w-0">
-                  <div className="truncate text-[16px] font-semibold text-textPrimary">
-                    {printerLabelById.get(p.id) ?? p.displayName}
+            const st = p.snapshot.state;
+            const showActions =
+              st === 'printing' || st === 'paused' || st === 'error';
+            const filename =
+              st === 'standby'
+                ? '—'
+                : (p.snapshot.jobLabel ?? p.snapshot.filename ?? '—');
+            return (
+              <Card
+                key={p.id}
+                className={st === 'error' ? 'border-danger/40' : ''}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <Link
+                    href={`/printers?focus=${encodeURIComponent(p.id)}`}
+                    className="block min-w-0"
+                  >
+                    <div className="truncate text-[16px] font-semibold text-textPrimary">
+                      {printerLabelById.get(p.id) ?? p.displayName}
+                    </div>
+                  </Link>
+                  <div className="flex items-center gap-2">
+                    {(st === 'printing' || st === 'paused') && (
+                      <button
+                        type="button"
+                        onClick={() => void emergencyStop(p.id)}
+                        className="flex h-8 w-8 items-center justify-center rounded-btn border border-danger/50 bg-surface2 text-danger transition active:scale-[0.98]"
+                        aria-label="Emergency stop"
+                        title="Emergency stop"
+                      >
+                        <OctagonX size={16} />
+                      </button>
+                    )}
+                    <StatusPill state={st} />
                   </div>
-                </Link>
-                <div className="flex items-center gap-2">
-                  {(st === 'printing' || st === 'paused') && (
-                    <button
-                      type="button"
-                      onClick={() => void emergencyStop(p.id)}
-                      className="flex h-8 w-8 items-center justify-center rounded-btn border border-danger/50 bg-surface2 text-danger transition active:scale-[0.98]"
-                      aria-label="Emergency stop"
-                      title="Emergency stop"
+                </div>
+
+                {/* G-code thumbnail + progress */}
+                {(st === 'printing' || st === 'paused') &&
+                  p.snapshot.filename && (
+                    <Link
+                      href={`/printers/${p.id}/3d?filename=${encodeURIComponent(p.snapshot.filename)}`}
+                      className="mt-3 block"
                     >
-                      <OctagonX size={16} />
-                    </button>
+                      <GCodeThumbnail
+                        printerId={p.id}
+                        filename={p.snapshot.filename}
+                        token={token ?? ''}
+                        className="h-[80px] w-full object-cover"
+                      />
+                    </Link>
                   )}
-                  <StatusPill state={st} />
-                </div>
-              </div>
 
-              {/* G-code thumbnail + progress */}
-              {(st === 'printing' || st === 'paused') && p.snapshot.filename && (
-                <Link
-                  href={`/printers/${p.id}/3d?filename=${encodeURIComponent(p.snapshot.filename)}`}
-                  className="mt-3 block"
-                >
-                  <GCodeThumbnail
-                    printerId={p.id}
-                    filename={p.snapshot.filename}
-                    token={token ?? ''}
-                    className="h-[80px] w-full object-cover"
+                <div className="mt-3">
+                  <ProgressBar value01={p.snapshot.progress} />
+                  <div className="mt-2 flex items-center justify-between text-xs">
+                    <div className="min-w-0 truncate text-textSecondary">
+                      {filename}
+                    </div>
+                    <div className="shrink-0 text-textPrimary">
+                      {fmtPct(p.snapshot.progress)}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-3 grid grid-cols-3 gap-2">
+                  <InsetStat label="ETA" value={fmtEta(p.snapshot.etaSec)} />
+                  <InsetStat
+                    label="TEMPS"
+                    value={`${p.snapshot.temps.extruder ?? '—'}/${p.snapshot.temps.bed ?? '—'}`}
                   />
-                </Link>
-              )}
-
-              <div className="mt-3">
-                <ProgressBar value01={p.snapshot.progress} />
-                <div className="mt-2 flex items-center justify-between text-xs">
-                  <div className="min-w-0 truncate text-textSecondary">
-                    {filename}
-                  </div>
-                  <div className="shrink-0 text-textPrimary">
-                    {fmtPct(p.snapshot.progress)}
-                  </div>
+                  <InsetStat
+                    label="LAYERS"
+                    value={`${p.snapshot.layers.current ?? '—'}/${p.snapshot.layers.total ?? '—'}`}
+                  />
                 </div>
-              </div>
 
-              <div className="mt-3 grid grid-cols-3 gap-2">
-                <InsetStat label="ETA" value={fmtEta(p.snapshot.etaSec)} />
-                <InsetStat
-                  label="TEMPS"
-                  value={`${p.snapshot.temps.extruder ?? '—'}/${p.snapshot.temps.bed ?? '—'}`}
-                />
-                <InsetStat
-                  label="LAYERS"
-                  value={`${p.snapshot.layers.current ?? '—'}/${p.snapshot.layers.total ?? '—'}`}
-                />
-              </div>
+                {showActions && (
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    {st === 'printing' && (
+                      <Button
+                        variant="secondary"
+                        onClick={() => void pause(p.id)}
+                      >
+                        Pause
+                      </Button>
+                    )}
+                    {st === 'paused' && (
+                      <Button
+                        variant="primary"
+                        onClick={() => void resume(p.id)}
+                      >
+                        Resume
+                      </Button>
+                    )}
+                    <Button
+                      variant="destructive"
+                      onClick={() =>
+                        setCancelConfirm({
+                          open: true,
+                          printerId: p.id,
+                          printerName:
+                            printerLabelById.get(p.id) ?? p.displayName,
+                          filename:
+                            p.snapshot.jobLabel ?? p.snapshot.filename ?? '—',
+                        })
+                      }
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                )}
 
-              {showActions && (
-                <div className="mt-3 grid grid-cols-2 gap-2">
-                  {st === 'printing' && (
+                {st === 'error' && (
+                  <div className="mt-2 grid grid-cols-2 gap-2">
                     <Button
                       variant="secondary"
-                      onClick={() => void pause(p.id)}
+                      onClick={() => void firmwareRestart(p.id)}
                     >
-                      Pause
+                      Firmware restart
                     </Button>
-                  )}
-                  {st === 'paused' && (
-                    <Button variant="primary" onClick={() => void resume(p.id)}>
-                      Resume
-                    </Button>
-                  )}
-                  <Button
-                    variant="destructive"
-                    onClick={() =>
-                      setCancelConfirm({
-                        open: true,
-                        printerId: p.id,
-                        printerName:
-                          printerLabelById.get(p.id) ?? p.displayName,
-                        filename:
-                          p.snapshot.jobLabel ?? p.snapshot.filename ?? '—',
-                      })
-                    }
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              )}
+                  </div>
+                )}
 
-              {st === 'error' && (
-                <div className="mt-2 grid grid-cols-2 gap-2">
-                  <Button
-                    variant="secondary"
-                    onClick={() => void firmwareRestart(p.id)}
-                  >
-                    Firmware restart
-                  </Button>
-                </div>
-              )}
-
-              {st === 'standby' && (
-                <div className="mt-2 text-[11px] text-textMuted">Ready</div>
-              )}
-            </Card>
-          );
-        })
+                {st === 'standby' && (
+                  <div className="mt-2 text-[11px] text-textMuted">Ready</div>
+                )}
+              </Card>
+            );
+          })
         ) : (
           // Compact view - comparison mode
           <div className="space-y-2">
             {/* Progress comparison */}
             <div className="rounded-btn border border-border/45 bg-surface2/55 p-3">
-              <div className="text-xs font-medium text-textPrimary">Progress comparison</div>
+              <div className="text-xs font-medium text-textPrimary">
+                Progress comparison
+              </div>
               <div className="mt-2 space-y-2">
                 {printers
-                  .filter(p => p.snapshot.state === 'printing' || p.snapshot.state === 'paused')
-                  .sort((a, b) => (b.snapshot.progress ?? 0) - (a.snapshot.progress ?? 0))
-                  .map(p => (
+                  .filter(
+                    (p) =>
+                      p.snapshot.state === 'printing' ||
+                      p.snapshot.state === 'paused',
+                  )
+                  .sort(
+                    (a, b) =>
+                      (b.snapshot.progress ?? 0) - (a.snapshot.progress ?? 0),
+                  )
+                  .map((p) => (
                     <div key={p.id} className="flex items-center gap-2">
                       <div className="w-24 truncate text-xs text-textSecondary">
                         {printerLabelById.get(p.id) ?? p.displayName}
@@ -441,7 +493,11 @@ export default function DashboardPage() {
                       <StatusPill state={p.snapshot.state} />
                     </div>
                   ))}
-                {printers.filter(p => p.snapshot.state === 'printing' || p.snapshot.state === 'paused').length === 0 && (
+                {printers.filter(
+                  (p) =>
+                    p.snapshot.state === 'printing' ||
+                    p.snapshot.state === 'paused',
+                ).length === 0 && (
                   <div className="text-xs text-textMuted">No active prints</div>
                 )}
               </div>
@@ -449,11 +505,13 @@ export default function DashboardPage() {
 
             {/* All printers list */}
             <div className="rounded-btn border border-border/45 bg-surface2/55 p-3">
-              <div className="text-xs font-medium text-textPrimary">All printers</div>
+              <div className="text-xs font-medium text-textPrimary">
+                All printers
+              </div>
               <div className="mt-2 divide-y divide-border/30">
-                {printers.map(p => (
-                  <Link 
-                    key={p.id} 
+                {printers.map((p) => (
+                  <Link
+                    key={p.id}
                     href={`/printers?focus=${encodeURIComponent(p.id)}`}
                     className="flex items-center gap-3 py-2 last:pb-0"
                   >
@@ -462,9 +520,13 @@ export default function DashboardPage() {
                       {printerLabelById.get(p.id) ?? p.displayName}
                     </div>
                     <div className="text-xs text-textMuted">
-                      {p.snapshot.state === 'standby' ? 'Ready' : 
-                       p.snapshot.state === 'printing' ? fmtEta(p.snapshot.etaSec) :
-                       p.snapshot.state === 'paused' ? 'Paused' : 'Error'}
+                      {p.snapshot.state === 'standby'
+                        ? 'Ready'
+                        : p.snapshot.state === 'printing'
+                          ? fmtEta(p.snapshot.etaSec)
+                          : p.snapshot.state === 'paused'
+                            ? 'Paused'
+                            : 'Error'}
                     </div>
                   </Link>
                 ))}

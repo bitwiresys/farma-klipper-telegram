@@ -18,7 +18,7 @@ export function Skeleton({
   animation = 'pulse',
 }: SkeletonProps) {
   const baseClasses = 'bg-surface2/70';
-  
+
   const variantClasses = {
     text: 'rounded-sm',
     rect: 'rounded-btn',
@@ -48,7 +48,9 @@ export function Skeleton({
 // Preset skeleton for card loading
 export function SkeletonCard({ className = '' }: { className?: string }) {
   return (
-    <div className={`rounded-card border border-border/45 bg-surface p-3 ${className}`}>
+    <div
+      className={`rounded-card border border-border/45 bg-surface p-3 ${className}`}
+    >
       <div className="flex items-start gap-3">
         <Skeleton width={36} height={36} variant="rect" />
         <div className="flex-1 space-y-2">
@@ -82,9 +84,15 @@ export function SkeletonListItem({ className = '' }: { className?: string }) {
 }
 
 // Preset skeleton for history item
-export function SkeletonHistoryItem({ className = '' }: { className?: string }) {
+export function SkeletonHistoryItem({
+  className = '',
+}: {
+  className?: string;
+}) {
   return (
-    <div className={`rounded-btn border border-border/45 bg-surface p-3 ${className}`}>
+    <div
+      className={`rounded-btn border border-border/45 bg-surface p-3 ${className}`}
+    >
       <div className="flex items-start gap-3">
         <Skeleton width={36} height={36} variant="rect" />
         <div className="flex-1 space-y-1">
@@ -101,8 +109,8 @@ export function SkeletonHistoryItem({ className = '' }: { className?: string }) 
 }
 
 // Multiple skeletons for loading states
-export function SkeletonGroup({ 
-  count = 3, 
+export function SkeletonGroup({
+  count = 3,
   skeleton: SkeletonComponent,
   className = '',
 }: {

@@ -41,8 +41,9 @@ export function usePush(): PushContext {
 
   // Check support and load initial state
   useEffect(() => {
-    const isSupported = typeof window !== 'undefined' && 
-      'serviceWorker' in navigator && 
+    const isSupported =
+      typeof window !== 'undefined' &&
+      'serviceWorker' in navigator &&
       'PushManager' in window;
 
     setState((s) => ({ ...s, isSupported }));
@@ -72,9 +73,11 @@ export function usePush(): PushContext {
   const loadSubscriptions = async () => {
     if (!token) return;
     try {
-      const res = await apiRequest<{ subscriptions: PushSubscriptionInfo[] }>('/api/push/subscriptions');
-      setState((s) => ({ 
-        ...s, 
+      const res = await apiRequest<{ subscriptions: PushSubscriptionInfo[] }>(
+        '/api/push/subscriptions',
+      );
+      setState((s) => ({
+        ...s,
         subscriptions: res.subscriptions,
         isSubscribed: res.subscriptions.length > 0,
       }));
@@ -104,7 +107,11 @@ export function usePush(): PushContext {
       if (state.permission !== 'granted') {
         const granted = await requestPermission();
         if (!granted) {
-          setState((s) => ({ ...s, loading: false, error: 'Permission denied' }));
+          setState((s) => ({
+            ...s,
+            loading: false,
+            error: 'Permission denied',
+          }));
           return;
         }
       }
@@ -115,7 +122,9 @@ export function usePush(): PushContext {
       // Subscribe to push
       const subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(state.publicKey) as BufferSource,
+        applicationServerKey: urlBase64ToUint8Array(
+          state.publicKey,
+        ) as BufferSource,
       });
 
       // Send subscription to server
@@ -130,45 +139,48 @@ export function usePush(): PushContext {
       await loadSubscriptions();
       setState((s) => ({ ...s, loading: false, isSubscribed: true }));
     } catch (e) {
-      setState((s) => ({ 
-        ...s, 
-        loading: false, 
+      setState((s) => ({
+        ...s,
+        loading: false,
         error: e instanceof Error ? e.message : 'Failed to subscribe',
       }));
     }
   }, [token, state.publicKey, state.permission, requestPermission]);
 
-  const unsubscribe = useCallback(async (endpoint?: string) => {
-    if (!token) return;
+  const unsubscribe = useCallback(
+    async (endpoint?: string) => {
+      if (!token) return;
 
-    setState((s) => ({ ...s, loading: true, error: null }));
+      setState((s) => ({ ...s, loading: true, error: null }));
 
-    try {
-      await apiRequest('/api/push/unsubscribe', {
-        token,
-        method: 'POST',
-        body: endpoint ? { endpoint } : {},
-      });
+      try {
+        await apiRequest('/api/push/unsubscribe', {
+          token,
+          method: 'POST',
+          body: endpoint ? { endpoint } : {},
+        });
 
-      // Also unsubscribe from browser
-      if (!endpoint) {
-        const registration = await navigator.serviceWorker.ready;
-        const subscription = await registration.pushManager.getSubscription();
-        if (subscription) {
-          await subscription.unsubscribe();
+        // Also unsubscribe from browser
+        if (!endpoint) {
+          const registration = await navigator.serviceWorker.ready;
+          const subscription = await registration.pushManager.getSubscription();
+          if (subscription) {
+            await subscription.unsubscribe();
+          }
         }
-      }
 
-      await loadSubscriptions();
-      setState((s) => ({ ...s, loading: false, isSubscribed: false }));
-    } catch (e) {
-      setState((s) => ({ 
-        ...s, 
-        loading: false, 
-        error: e instanceof Error ? e.message : 'Failed to unsubscribe',
-      }));
-    }
-  }, [token]);
+        await loadSubscriptions();
+        setState((s) => ({ ...s, loading: false, isSubscribed: false }));
+      } catch (e) {
+        setState((s) => ({
+          ...s,
+          loading: false,
+          error: e instanceof Error ? e.message : 'Failed to unsubscribe',
+        }));
+      }
+    },
+    [token],
+  );
 
   return {
     ...state,
@@ -181,9 +193,7 @@ export function usePush(): PushContext {
 // Helper to convert VAPID key
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding)
-    .replace(/-/g, '+')
-    .replace(/_/g, '/');
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
 
   const rawData = window.atob(base64);
   const outputArray = new Uint8Array(rawData.length);

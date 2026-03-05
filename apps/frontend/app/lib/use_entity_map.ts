@@ -12,7 +12,10 @@ function getEntityId<T>(item: T): string {
   return (item as any).id;
 }
 
-function entityReducer<T>(state: Map<string, T>, action: Action<T>): Map<string, T> {
+function entityReducer<T>(
+  state: Map<string, T>,
+  action: Action<T>,
+): Map<string, T> {
   switch (action.type) {
     case 'SNAPSHOT': {
       const next = new Map<string, T>();
@@ -105,7 +108,8 @@ export function usePrintersMap(): {
   const { map, list, subscribe } = useEntityMap<PrinterDto>({
     snapshotEventType: 'PRINTERS_SNAPSHOT',
     updateEventType: 'PRINTER_STATUS',
-    getSnapshotItems: (payload) => payload?.printers as PrinterDto[] | undefined,
+    getSnapshotItems: (payload) =>
+      payload?.printers as PrinterDto[] | undefined,
     getUpdateItem: (payload) => {
       const p = payload?.printer as PrinterDto | undefined;
       if (!p) return undefined;

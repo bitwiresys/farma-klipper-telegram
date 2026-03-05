@@ -70,7 +70,10 @@ export default function AnalyticsPage() {
     Promise.all([
       apiRequest<FilamentStats>('/api/analytics/filament', { token }),
       apiRequest<PrintStats>('/api/analytics/prints', { token }),
-      apiRequest<{ data: TimeSeriesPoint[] }>('/api/analytics/timeseries?days=14', { token }),
+      apiRequest<{ data: TimeSeriesPoint[] }>(
+        '/api/analytics/timeseries?days=14',
+        { token },
+      ),
       apiRequest<UptimeStats>('/api/analytics/uptime', { token }),
     ])
       .then(([f, p, t, u]) => {
@@ -88,7 +91,9 @@ export default function AnalyticsPage() {
   }
 
   if (loading) {
-    return <div className="text-xs text-textSecondary">Loading analytics...</div>;
+    return (
+      <div className="text-xs text-textSecondary">Loading analytics...</div>
+    );
   }
 
   if (error) {
@@ -135,9 +140,7 @@ export default function AnalyticsPage() {
           <div className="mt-2 text-2xl font-semibold text-textPrimary">
             {fmtDuration(prints?.avgDurationSec ?? null)}
           </div>
-          <div className="mt-1 text-xs text-textMuted">
-            per print
-          </div>
+          <div className="mt-1 text-xs text-textMuted">per print</div>
         </Card>
 
         <Card className="p-3">
@@ -148,21 +151,24 @@ export default function AnalyticsPage() {
           <div className="mt-2 text-2xl font-semibold text-textPrimary">
             {uptime?.printers?.length ?? 0}
           </div>
-          <div className="mt-1 text-xs text-textMuted">
-            with history
-          </div>
+          <div className="mt-1 text-xs text-textMuted">with history</div>
         </Card>
       </div>
 
       {/* Prints chart */}
       <Card className="p-3">
-        <div className="text-xs font-medium text-textPrimary">Prints (last 14 days)</div>
+        <div className="text-xs font-medium text-textPrimary">
+          Prints (last 14 days)
+        </div>
         <div className="mt-3 flex items-end gap-1" style={{ height: '80px' }}>
           {timeseries.map((t) => (
             <div
               key={t.date}
               className="flex-1 rounded-t bg-accentCyan/40 transition hover:bg-accentCyan/60"
-              style={{ height: `${(t.count / maxCount) * 100}%`, minHeight: t.count > 0 ? '4px' : '0' }}
+              style={{
+                height: `${(t.count / maxCount) * 100}%`,
+                minHeight: t.count > 0 ? '4px' : '0',
+              }}
               title={`${t.date}: ${t.count} prints`}
             />
           ))}
@@ -176,7 +182,9 @@ export default function AnalyticsPage() {
       {/* Printer usage */}
       {uptime && uptime.printers.length > 0 && (
         <Card className="p-3">
-          <div className="text-xs font-medium text-textPrimary">Printer usage</div>
+          <div className="text-xs font-medium text-textPrimary">
+            Printer usage
+          </div>
           <div className="mt-2 space-y-2">
             {uptime.printers.slice(0, 5).map((p) => (
               <div key={p.name} className="space-y-1">
@@ -184,8 +192,8 @@ export default function AnalyticsPage() {
                   <div className="truncate text-textSecondary">{p.name}</div>
                   <div className="text-textPrimary">{p.totalHours}h</div>
                 </div>
-                <ProgressBar 
-                  value01={p.totalHours / (uptime.printers[0]?.totalHours || 1)} 
+                <ProgressBar
+                  value01={p.totalHours / (uptime.printers[0]?.totalHours || 1)}
                 />
               </div>
             ))}
@@ -196,10 +204,15 @@ export default function AnalyticsPage() {
       {/* Filament by printer */}
       {filament && filament.byPrinter.length > 0 && (
         <Card className="p-3">
-          <div className="text-xs font-medium text-textPrimary">Filament by printer</div>
+          <div className="text-xs font-medium text-textPrimary">
+            Filament by printer
+          </div>
           <div className="mt-2 space-y-2">
             {filament.byPrinter.slice(0, 5).map((p) => (
-              <div key={p.name} className="flex items-center justify-between text-xs">
+              <div
+                key={p.name}
+                className="flex items-center justify-between text-xs"
+              >
                 <div className="truncate text-textSecondary">{p.name}</div>
                 <div className="text-textPrimary">{fmtMeters(p.mm)}</div>
               </div>
@@ -213,7 +226,8 @@ export default function AnalyticsPage() {
         <Card className="border-danger/30 bg-danger/5 p-3">
           <div className="text-xs font-medium text-danger">Errors</div>
           <div className="mt-2 text-xs text-textSecondary">
-            {prints.error} prints ended with error ({Math.round((prints.error / prints.total) * 100)}%)
+            {prints.error} prints ended with error (
+            {Math.round((prints.error / prints.total) * 100)}%)
           </div>
         </Card>
       )}

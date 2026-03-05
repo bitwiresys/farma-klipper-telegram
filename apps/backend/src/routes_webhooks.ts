@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 
 import { prisma } from './prisma.js';
 
-type WebhookEvent = 
+type WebhookEvent =
   | 'print.started'
   | 'print.completed'
   | 'print.error'
@@ -51,7 +51,7 @@ async function getWebhooks(): Promise<WebhookConfig[]> {
     where: { enabled: true },
   });
 
-  webhookCache = webhooks.map(w => ({
+  webhookCache = webhooks.map((w) => ({
     id: w.id,
     url: w.url,
     secret: w.secret,
@@ -71,10 +71,10 @@ export function invalidateWebhookCache(): void {
 // Trigger webhooks for an event
 export async function triggerWebhooks(
   event: WebhookEvent,
-  payload: Omit<WebhookPayload, 'event' | 'timestamp'>
+  payload: Omit<WebhookPayload, 'event' | 'timestamp'>,
 ): Promise<void> {
   const webhooks = await getWebhooks();
-  const relevant = webhooks.filter(w => w.events.includes(event));
+  const relevant = webhooks.filter((w) => w.events.includes(event));
 
   if (relevant.length === 0) return;
 
@@ -102,15 +102,15 @@ export async function triggerWebhooks(
             encoder.encode(webhook.secret),
             { name: 'HMAC', hash: 'SHA-256' },
             false,
-            ['sign']
+            ['sign'],
           );
           const signature = await crypto.subtle.sign(
             'HMAC',
             key,
-            encoder.encode(JSON.stringify(fullPayload))
+            encoder.encode(JSON.stringify(fullPayload)),
           );
           const sigHex = Array.from(new Uint8Array(signature))
-            .map(b => b.toString(16).padStart(2, '0'))
+            .map((b) => b.toString(16).padStart(2, '0'))
             .join('');
           headers['X-Webhook-Signature'] = `sha256=${sigHex}`;
         }
@@ -139,11 +139,12 @@ export async function triggerWebhooks(
             event,
             status: 'failed',
             statusCode: 0,
-            responseBody: error instanceof Error ? error.message : 'Unknown error',
+            responseBody:
+              error instanceof Error ? error.message : 'Unknown error',
           },
         });
       }
-    })
+    }),
   );
 }
 

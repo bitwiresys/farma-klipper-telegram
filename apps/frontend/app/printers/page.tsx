@@ -116,7 +116,9 @@ export default function PrintersPage() {
         return;
       }
       if (e.type === 'PRINTER_MODELS_SNAPSHOT') {
-        const ms = e.payload?.models as Array<{ id: string; name: string }> | undefined;
+        const ms = e.payload?.models as
+          | Array<{ id: string; name: string }>
+          | undefined;
         if (ms) setModels(ms);
       }
     });
@@ -315,75 +317,79 @@ export default function PrintersPage() {
                     </div>
 
                     {/* G-code thumbnail */}
-                    {(state === 'printing' || state === 'paused') && filename && (
-                      <div className="mt-3">
-                        <GCodeThumbnail
-                          printerId={p.id}
-                          filename={filename}
-                          token={token ?? ''}
-                          className="h-[60px] w-full rounded-btn object-cover"
-                        />
-                      </div>
-                    )}
-
-                  <div className="mt-3 flex items-end justify-between gap-3">
-                    <div className="text-[28px] font-semibold leading-none text-textPrimary">
-                      {fmtPct01(progress)}
-                    </div>
-                    <div className="text-right text-xs text-textMuted">
-                      ETA{' '}
-                      {etaSec === null || etaSec === undefined
-                        ? '-'
-                        : `${Math.max(0, Math.floor(etaSec / 60))}m`}
-                    </div>
-                  </div>
-
-                  <div className="mt-3">
-                    <ProgressBar value01={progress ?? null} />
-                  </div>
-
-                  <div className="mt-3 grid grid-cols-2 gap-2">
-                    <InsetStat
-                      label="EXTRUDER"
-                      value={`${(p.snapshot as any)?.temps?.extruder ?? '—'}°C`}
-                      right={
-                        (p.snapshot as any)?.temps?.extruderTarget
-                          ? `target ${(p.snapshot as any)?.temps?.extruderTarget}`
-                          : undefined
-                      }
-                    />
-                    <InsetStat
-                      label="BED"
-                      value={`${(p.snapshot as any)?.temps?.bed ?? '—'}°C`}
-                      right={
-                        (p.snapshot as any)?.temps?.bedTarget
-                          ? `target ${(p.snapshot as any)?.temps?.bedTarget}`
-                          : undefined
-                      }
-                    />
-                  </div>
-
-                  <div className="mt-3 grid grid-cols-2 gap-2">
-                    <InsetStat
-                      label="LAYERS"
-                      value={`${layers?.current ?? '—'} / ${layers?.total ?? '—'}`}
-                    />
-                    <InsetStat
-                      label="STATE"
-                      value={String(state).toUpperCase()}
-                    />
-                  </div>
-
-                  <div className="mt-3 grid grid-cols-3 gap-2">
-                    <InsetStat label="SPEED" value={fmtMmS(liveVelocityMmS)} />
-                    <InsetStat label="FLOW" value={fmtMm3S(flowMm3S)} />
-                    <InsetStat
-                      label="FAN"
-                      value={fmtPct100(
-                        fan === null || fan === undefined ? null : fan * 100,
+                    {(state === 'printing' || state === 'paused') &&
+                      filename && (
+                        <div className="mt-3">
+                          <GCodeThumbnail
+                            printerId={p.id}
+                            filename={filename}
+                            token={token ?? ''}
+                            className="h-[60px] w-full rounded-btn object-cover"
+                          />
+                        </div>
                       )}
-                    />
-                  </div>
+
+                    <div className="mt-3 flex items-end justify-between gap-3">
+                      <div className="text-[28px] font-semibold leading-none text-textPrimary">
+                        {fmtPct01(progress)}
+                      </div>
+                      <div className="text-right text-xs text-textMuted">
+                        ETA{' '}
+                        {etaSec === null || etaSec === undefined
+                          ? '-'
+                          : `${Math.max(0, Math.floor(etaSec / 60))}m`}
+                      </div>
+                    </div>
+
+                    <div className="mt-3">
+                      <ProgressBar value01={progress ?? null} />
+                    </div>
+
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      <InsetStat
+                        label="EXTRUDER"
+                        value={`${(p.snapshot as any)?.temps?.extruder ?? '—'}°C`}
+                        right={
+                          (p.snapshot as any)?.temps?.extruderTarget
+                            ? `target ${(p.snapshot as any)?.temps?.extruderTarget}`
+                            : undefined
+                        }
+                      />
+                      <InsetStat
+                        label="BED"
+                        value={`${(p.snapshot as any)?.temps?.bed ?? '—'}°C`}
+                        right={
+                          (p.snapshot as any)?.temps?.bedTarget
+                            ? `target ${(p.snapshot as any)?.temps?.bedTarget}`
+                            : undefined
+                        }
+                      />
+                    </div>
+
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      <InsetStat
+                        label="LAYERS"
+                        value={`${layers?.current ?? '—'} / ${layers?.total ?? '—'}`}
+                      />
+                      <InsetStat
+                        label="STATE"
+                        value={String(state).toUpperCase()}
+                      />
+                    </div>
+
+                    <div className="mt-3 grid grid-cols-3 gap-2">
+                      <InsetStat
+                        label="SPEED"
+                        value={fmtMmS(liveVelocityMmS)}
+                      />
+                      <InsetStat label="FLOW" value={fmtMm3S(flowMm3S)} />
+                      <InsetStat
+                        label="FAN"
+                        value={fmtPct100(
+                          fan === null || fan === undefined ? null : fan * 100,
+                        )}
+                      />
+                    </div>
                   </Card>
                 </div>
               </button>
@@ -404,18 +410,16 @@ export default function PrintersPage() {
       )}
 
       {/* Edit Printer BottomSheet */}
-      <BottomSheet
-        open={!!openId}
-        onClose={closeSheet}
-        title="Edit printer"
-      >
+      <BottomSheet open={!!openId} onClose={closeSheet} title="Edit printer">
         {!activePrinter && (
           <div className="text-xs text-textSecondary">Loading…</div>
         )}
 
         {activePrinter && (
           <div className="space-y-3">
-            {editErr && <div className="break-all text-xs text-red-400">{editErr}</div>}
+            {editErr && (
+              <div className="break-all text-xs text-red-400">{editErr}</div>
+            )}
 
             <Card className="p-3">
               <div className="text-xs font-medium text-textPrimary">Fields</div>
@@ -473,7 +477,8 @@ export default function PrintersPage() {
                 <div className="rounded-btn border border-border/45 bg-surface2/55 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
                   <div className="text-textMuted">Bed size</div>
                   <div className="text-textPrimary">
-                    {fmtNum(activePrinter.bedX, 0)}×{fmtNum(activePrinter.bedY, 0)}×
+                    {fmtNum(activePrinter.bedX, 0)}×
+                    {fmtNum(activePrinter.bedY, 0)}×
                     {fmtNum(activePrinter.bedZ, 0)}
                   </div>
                 </div>

@@ -92,7 +92,9 @@ export default function NewPresetPage() {
       }
 
       if (e.type === 'PRINTER_MODELS_SNAPSHOT') {
-        const ms = e.payload?.models as Array<{ id: string; name: string }> | undefined;
+        const ms = e.payload?.models as
+          | Array<{ id: string; name: string }>
+          | undefined;
         if (ms) setModels(ms);
       }
 

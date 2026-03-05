@@ -72,7 +72,11 @@ export async function registerPushRoutes(app: FastifyInstance) {
     const body = (req.body ?? {}) as any;
     const subscription = body.subscription as PushSubscription | undefined;
 
-    if (!subscription?.endpoint || !subscription.keys?.p256dh || !subscription.keys?.auth) {
+    if (
+      !subscription?.endpoint ||
+      !subscription.keys?.p256dh ||
+      !subscription.keys?.auth
+    ) {
       return reply.code(400).send({
         error: 'INVALID_SUBSCRIPTION',
         message: 'Missing required subscription fields',
@@ -187,7 +191,10 @@ export async function sendPushToUser(
         const status = e?.statusCode;
         // 410 = subscription expired, 404 = not found
         if (status === 410 || status === 404) {
-          logger.info({ telegramId, endpoint: sub.endpoint }, 'push subscription expired, removing');
+          logger.info(
+            { telegramId, endpoint: sub.endpoint },
+            'push subscription expired, removing',
+          );
           await prisma.pushSubscription.delete({
             where: { id: sub.id },
           });

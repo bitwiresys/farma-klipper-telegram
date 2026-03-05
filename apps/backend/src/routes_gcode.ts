@@ -55,7 +55,10 @@ export async function registerGcodeRoutes(app: FastifyInstance) {
       return reply.type('text/plain').send(text);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      logger.warn({ printerId, filename: query.filename, err: msg }, 'gcode fetch failed');
+      logger.warn(
+        { printerId, filename: query.filename, err: msg },
+        'gcode fetch failed',
+      );
       return reply.code(502).send({ error: 'MOONRAKER_ERROR', message: msg });
     }
   });
@@ -98,7 +101,10 @@ export async function registerGcodeRoutes(app: FastifyInstance) {
       return reply.send(meta);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      logger.warn({ printerId, filename: query.filename, err: msg }, 'gcode metadata fetch failed');
+      logger.warn(
+        { printerId, filename: query.filename, err: msg },
+        'gcode metadata fetch failed',
+      );
       return reply.code(502).send({ error: 'MOONRAKER_ERROR', message: msg });
     }
   });

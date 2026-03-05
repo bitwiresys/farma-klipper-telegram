@@ -26,33 +26,41 @@ export function usePullToRefresh({
   const startY = useRef(0);
   const containerRef = useRef<HTMLElement | null>(null);
 
-  const handleTouchStart = useCallback((e: TouchEvent) => {
-    if (!enabled || isRefreshing) return;
+  const handleTouchStart = useCallback(
+    (e: TouchEvent) => {
+      if (!enabled || isRefreshing) return;
 
-    // Only trigger when scrolled to top
-    const target = e.target as HTMLElement;
-    const scrollContainer = target.closest('[data-pull-container]') as HTMLElement | null;
-    if (scrollContainer && scrollContainer.scrollTop > 0) return;
-    if (!scrollContainer && window.scrollY > 0) return;
+      // Only trigger when scrolled to top
+      const target = e.target as HTMLElement;
+      const scrollContainer = target.closest(
+        '[data-pull-container]',
+      ) as HTMLElement | null;
+      if (scrollContainer && scrollContainer.scrollTop > 0) return;
+      if (!scrollContainer && window.scrollY > 0) return;
 
-    startY.current = e.touches[0]?.clientY ?? 0;
-    setIsPulling(true);
-  }, [enabled, isRefreshing]);
+      startY.current = e.touches[0]?.clientY ?? 0;
+      setIsPulling(true);
+    },
+    [enabled, isRefreshing],
+  );
 
-  const handleTouchMove = useCallback((e: TouchEvent) => {
-    if (!isPulling || !enabled || isRefreshing) return;
+  const handleTouchMove = useCallback(
+    (e: TouchEvent) => {
+      if (!isPulling || !enabled || isRefreshing) return;
 
-    const currentY = e.touches[0]?.clientY ?? 0;
-    const diff = currentY - startY.current;
+      const currentY = e.touches[0]?.clientY ?? 0;
+      const diff = currentY - startY.current;
 
-    // Only track downward pulls
-    if (diff > 0) {
-      // Apply resistance
-      const resistance = 0.5;
-      const distance = Math.min(diff * resistance, threshold * 1.5);
-      setPullDistance(distance);
-    }
-  }, [isPulling, enabled, isRefreshing, threshold]);
+      // Only track downward pulls
+      if (diff > 0) {
+        // Apply resistance
+        const resistance = 0.5;
+        const distance = Math.min(diff * resistance, threshold * 1.5);
+        setPullDistance(distance);
+      }
+    },
+    [isPulling, enabled, isRefreshing, threshold],
+  );
 
   const handleTouchEnd = useCallback(async () => {
     if (!isPulling) return;
@@ -76,17 +84,26 @@ export function usePullToRefresh({
   useEffect(() => {
     if (!enabled) return;
 
-    const container = document.querySelector('[data-pull-container]') as HTMLElement | null;
+    const container = document.querySelector(
+      '[data-pull-container]',
+    ) as HTMLElement | null;
     containerRef.current = container;
 
     const target = container ?? document;
 
-    target.addEventListener('touchstart', handleTouchStart as EventListener, { passive: true });
-    target.addEventListener('touchmove', handleTouchMove as EventListener, { passive: true });
+    target.addEventListener('touchstart', handleTouchStart as EventListener, {
+      passive: true,
+    });
+    target.addEventListener('touchmove', handleTouchMove as EventListener, {
+      passive: true,
+    });
     target.addEventListener('touchend', handleTouchEnd as EventListener);
 
     return () => {
-      target.removeEventListener('touchstart', handleTouchStart as EventListener);
+      target.removeEventListener(
+        'touchstart',
+        handleTouchStart as EventListener,
+      );
       target.removeEventListener('touchmove', handleTouchMove as EventListener);
       target.removeEventListener('touchend', handleTouchEnd as EventListener);
     };

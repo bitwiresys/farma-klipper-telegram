@@ -45,7 +45,10 @@ function isProtectedApiRoute(method: string, pathname: string): boolean {
   if (m === 'POST' && /^\/api\/printers\/[^/]+\/(test|rescan)$/.test(pathname))
     return true;
 
-  if (m === 'POST' && /^\/api\/printers\/[^/]+\/(pause|resume|cancel)$/.test(pathname))
+  if (
+    m === 'POST' &&
+    /^\/api\/printers\/[^/]+\/(pause|resume|cancel)$/.test(pathname)
+  )
     return true;
 
   // G-code routes for 3D viewer

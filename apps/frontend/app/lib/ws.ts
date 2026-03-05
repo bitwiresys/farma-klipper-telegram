@@ -125,12 +125,15 @@ export function connectBackendWs(opts: {
       clearHeartbeat();
       opts.onStatus('closed');
       if (stopped) return;
-      
+
       // Exponential backoff with jitter
-      const baseDelay = Math.min(30000, Math.pow(2, Math.min(attempt, 5)) * 1000);
+      const baseDelay = Math.min(
+        30000,
+        Math.pow(2, Math.min(attempt, 5)) * 1000,
+      );
       const jitter = Math.random() * 1000;
       const delay = baseDelay + jitter;
-      
+
       setTimeout(connect, delay);
     };
   };

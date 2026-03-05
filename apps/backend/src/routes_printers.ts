@@ -98,7 +98,9 @@ export async function registerPrintersRoutes(app: FastifyInstance) {
         where: { printerId: p.id, remoteFilename: fn },
         include: { preset: { select: { title: true } } },
       });
-      jobLabel = deployment?.preset.title ? `preset: ${deployment.preset.title}` : null;
+      jobLabel = deployment?.preset.title
+        ? `preset: ${deployment.preset.title}`
+        : null;
     }
 
     return reply.send({

@@ -39,7 +39,11 @@ function GCode3DPageContent({ printerId }: { printerId: string }) {
 
   const [printer, setPrinter] = useState<PrinterDto | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [toolheadPos, setToolheadPos] = useState<{ x: number; y: number; z: number } | null>(null);
+  const [toolheadPos, setToolheadPos] = useState<{
+    x: number;
+    y: number;
+    z: number;
+  } | null>(null);
 
   // Fetch printer info
   useEffect(() => {
@@ -47,7 +51,10 @@ function GCode3DPageContent({ printerId }: { printerId: string }) {
 
     const fetchPrinter = async () => {
       try {
-        const res = await apiRequest<{ printer: PrinterDto }>(`/api/printers/${printerId}`, { token });
+        const res = await apiRequest<{ printer: PrinterDto }>(
+          `/api/printers/${printerId}`,
+          { token },
+        );
         setPrinter(res.printer);
       } catch {
         // Ignore
@@ -90,7 +97,8 @@ function GCode3DPageContent({ printerId }: { printerId: string }) {
     };
 
     document.addEventListener('fullscreenchange', handleFullscreenChange);
-    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    return () =>
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, []);
 
   const toggleFullscreen = () => {
@@ -181,14 +189,17 @@ function GCode3DPageContent({ printerId }: { printerId: string }) {
               <div>
                 <span className="text-textMuted">Pos: </span>
                 <span className="font-mono text-textPrimary">
-                  X{toolheadPos.x.toFixed(1)} Y{toolheadPos.y.toFixed(1)} Z{toolheadPos.z.toFixed(1)}
+                  X{toolheadPos.x.toFixed(1)} Y{toolheadPos.y.toFixed(1)} Z
+                  {toolheadPos.z.toFixed(1)}
                 </span>
               </div>
             )}
           </div>
           <div>
             <span className="text-textMuted">ETA: </span>
-            <span className="text-textPrimary">{fmtEta(printer?.snapshot.etaSec ?? null)}</span>
+            <span className="text-textPrimary">
+              {fmtEta(printer?.snapshot.etaSec ?? null)}
+            </span>
           </div>
         </div>
       </div>
@@ -196,7 +207,11 @@ function GCode3DPageContent({ printerId }: { printerId: string }) {
   );
 }
 
-export default function GCode3DPage({ params }: { params: Promise<{ id: string }> }) {
+export default function GCode3DPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
   const [printerId, setPrinterId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -212,7 +227,13 @@ export default function GCode3DPage({ params }: { params: Promise<{ id: string }
   }
 
   return (
-    <Suspense fallback={<div className="flex h-full items-center justify-center text-textMuted">Loading...</div>}>
+    <Suspense
+      fallback={
+        <div className="flex h-full items-center justify-center text-textMuted">
+          Loading...
+        </div>
+      }
+    >
       <GCode3DPageContent printerId={printerId} />
     </Suspense>
   );

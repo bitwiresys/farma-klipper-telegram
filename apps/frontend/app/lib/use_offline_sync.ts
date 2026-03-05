@@ -148,7 +148,8 @@ export function useOfflineSync(): OfflineSyncContext {
       const e = ev as any;
 
       if (e.type === 'PRINTERS_SNAPSHOT') {
-        const printers = (e.payload?.printers as PrinterDto[] | undefined) ?? [];
+        const printers =
+          (e.payload?.printers as PrinterDto[] | undefined) ?? [];
         void savePrinters(printers.map(printerToRow));
         setOfflineState({ lastSyncAt: Date.now() });
       }
@@ -167,7 +168,8 @@ export function useOfflineSync(): OfflineSyncContext {
       }
 
       if (e.type === 'HISTORY_SNAPSHOT') {
-        const history = (e.payload?.history as PrintHistoryDto[] | undefined) ?? [];
+        const history =
+          (e.payload?.history as PrintHistoryDto[] | undefined) ?? [];
         void saveHistory(history.map(historyToRow));
         setOfflineState({ lastSyncAt: Date.now() });
       }
@@ -216,7 +218,12 @@ export function useOfflineSync(): OfflineSyncContext {
     if (state.isOnline && state.pendingOperations > 0 && !state.isSyncing) {
       void processSyncQueue();
     }
-  }, [state.isOnline, state.pendingOperations, state.isSyncing, processSyncQueue]);
+  }, [
+    state.isOnline,
+    state.pendingOperations,
+    state.isSyncing,
+    processSyncQueue,
+  ]);
 
   // Update pending operations count
   useEffect(() => {
@@ -303,7 +310,9 @@ export function useCachedHistory(): {
     void (async () => {
       try {
         const cached = await getAllHistory();
-        setHistory(cached.sort((a, b) => b.startedAt.localeCompare(a.startedAt)));
+        setHistory(
+          cached.sort((a, b) => b.startedAt.localeCompare(a.startedAt)),
+        );
       } catch {
         // ignore
       } finally {

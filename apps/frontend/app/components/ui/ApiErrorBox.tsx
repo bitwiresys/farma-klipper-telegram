@@ -30,7 +30,9 @@ export function ApiErrorBox({ error, className }: ApiErrorBoxProps) {
   const hasDetails = error.bodyText && error.bodyText.length > 0;
 
   return (
-    <div className={`rounded-card border border-danger/40 bg-danger/10 p-3 ${className ?? ''}`}>
+    <div
+      className={`rounded-card border border-danger/40 bg-danger/10 p-3 ${className ?? ''}`}
+    >
       <div className="flex items-start justify-between gap-2">
         <div className="text-xs font-medium text-accentRed">{message}</div>
         {hasDetails && (
@@ -52,11 +54,19 @@ export function ApiErrorBox({ error, className }: ApiErrorBoxProps) {
   );
 }
 
-export function ErrorBox({ message, className }: { message: string | null; className?: string }) {
+export function ErrorBox({
+  message,
+  className,
+}: {
+  message: string | null;
+  className?: string;
+}) {
   if (!message) return null;
 
   return (
-    <div className={`rounded-card border border-danger/40 bg-danger/10 p-3 ${className ?? ''}`}>
+    <div
+      className={`rounded-card border border-danger/40 bg-danger/10 p-3 ${className ?? ''}`}
+    >
       <div className="text-xs font-medium text-accentRed">{message}</div>
     </div>
   );

@@ -163,7 +163,12 @@ export async function savePresets(presets: PresetRow[]): Promise<void> {
 }
 
 export async function getAllPresets(): Promise<PresetRow[]> {
-  return withStoreCursor('presets', 'readonly', (s) => s.openCursor(), (c) => c.value as PresetRow);
+  return withStoreCursor(
+    'presets',
+    'readonly',
+    (s) => s.openCursor(),
+    (c) => c.value as PresetRow,
+  );
 }
 
 export async function getPresetsSince(since: number): Promise<PresetRow[]> {
@@ -211,14 +216,22 @@ export async function savePrinters(printers: PrinterRow[]): Promise<void> {
 }
 
 export async function getAllPrinters(): Promise<PrinterRow[]> {
-  return withStoreCursor('printers', 'readonly', (s) => s.openCursor(), (c) => c.value as PrinterRow);
+  return withStoreCursor(
+    'printers',
+    'readonly',
+    (s) => s.openCursor(),
+    (c) => c.value as PrinterRow,
+  );
 }
 
 export async function getPrinter(id: string): Promise<PrinterRow | undefined> {
   return withStore('printers', 'readonly', (s) => s.get(id));
 }
 
-export async function updatePrinterSnapshot(id: string, snapshot: any): Promise<void> {
+export async function updatePrinterSnapshot(
+  id: string,
+  snapshot: any,
+): Promise<void> {
   const printer = await getPrinter(id);
   if (printer) {
     printer.snapshot = snapshot;
@@ -245,10 +258,17 @@ export async function saveHistory(history: HistoryRow[]): Promise<void> {
 }
 
 export async function getAllHistory(): Promise<HistoryRow[]> {
-  return withStoreCursor('history', 'readonly', (s) => s.openCursor(), (c) => c.value as HistoryRow);
+  return withStoreCursor(
+    'history',
+    'readonly',
+    (s) => s.openCursor(),
+    (c) => c.value as HistoryRow,
+  );
 }
 
-export async function getHistoryByPrinter(printerId: string): Promise<HistoryRow[]> {
+export async function getHistoryByPrinter(
+  printerId: string,
+): Promise<HistoryRow[]> {
   const db = await openDb();
   const tx = db.transaction('history', 'readonly');
   const store = tx.objectStore('history');
@@ -281,11 +301,18 @@ export async function addToSyncQueue(item: SyncQueueItem): Promise<void> {
 }
 
 export async function getSyncQueue(): Promise<SyncQueueItem[]> {
-  return withStoreCursor('syncQueue', 'readonly', (s) => s.openCursor(), (c) => c.value as SyncQueueItem);
+  return withStoreCursor(
+    'syncQueue',
+    'readonly',
+    (s) => s.openCursor(),
+    (c) => c.value as SyncQueueItem,
+  );
 }
 
 export async function removeFromSyncQueue(id: string): Promise<void> {
-  return withStore('syncQueue', 'readwrite', (s) => s.delete(id)).then(() => {});
+  return withStore('syncQueue', 'readwrite', (s) => s.delete(id)).then(
+    () => {},
+  );
 }
 
 export async function clearSyncQueue(): Promise<void> {
@@ -295,7 +322,10 @@ export async function clearSyncQueue(): Promise<void> {
 // Clear all data
 export async function clearAllData(): Promise<void> {
   const db = await openDb();
-  const tx = db.transaction(['presets', 'printers', 'history', 'syncQueue'], 'readwrite');
+  const tx = db.transaction(
+    ['presets', 'printers', 'history', 'syncQueue'],
+    'readwrite',
+  );
 
   tx.objectStore('presets').clear();
   tx.objectStore('printers').clear();
