@@ -1,6 +1,6 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 
 import type { CompatibilityReason, PresetDto, PrinterDto } from '../lib/dto';
@@ -86,11 +86,17 @@ export default function PresetsPage() {
   const { token } = useAuth();
   const ws = useWs();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [err, setErr] = useState<string | null>(null);
   const [presets, setPresets] = useState<PresetDto[]>([]);
   const [models, setModels] = useState<PrinterModelRow[]>([]);
   const [printers, setPrinters] = useState<PrinterDto[]>([]);
   const [query, setQuery] = useState('');
+
+  const focusId = useMemo(() => {
+    const raw = String(searchParams?.get('focus') ?? '').trim();
+    return raw ? raw : null;
+  }, [searchParams]);
 
   const [open, setOpen] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -297,6 +303,17 @@ export default function PresetsPage() {
     });
   }, [presets]);
 
+  // Scroll to focused preset
+  useEffect(() => {
+    if (!focusId) return;
+    const t = window.setTimeout(() => {
+      const el = document.getElementById(`preset-${focusId}`);
+      if (!el) return;
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 50);
+    return () => window.clearTimeout(t);
+  }, [focusId, presets.length]);
+
   return (
     <>
       <div className="flex items-center justify-between">
@@ -332,7 +349,13 @@ export default function PresetsPage() {
             {sorted.map((p) => (
               <button
                 key={p.id}
-                className="w-full text-left"
+                id={`preset-${p.id}`}
+                className={
+                  'w-full text-left ' +
+                  (focusId === p.id
+                    ? 'ring-2 ring-accentCyan/60 ring-offset-2 ring-offset-surface1 rounded-card'
+                    : '')
+                }
                 type="button"
                 onClick={() => {
                   setActiveId(p.id);
@@ -463,8 +486,16 @@ export default function PresetsPage() {
                       <div className="truncate font-medium text-textPrimary">
                         {active.title}
                       </div>
-                      <div className="mt-0.5 text-textSecondary">
-                        {active.plasticType}
+                      <div className="mt-1 flex items-center gap-2">
+                        <div
+                          className="inline-flex items-center rounded-full border border-border/45 px-2 py-1 text-[10px] font-semibold tracking-[0.12em] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
+                          style={{
+                            background: active.colorHex || '#ffffff',
+                            color: textColorForBg(active.colorHex || '#ffffff'),
+                          }}
+                        >
+                          {active.plasticType}
+                        </div>
                       </div>
                     </div>
                   </div>

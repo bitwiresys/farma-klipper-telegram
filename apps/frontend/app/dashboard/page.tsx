@@ -197,7 +197,7 @@ export default function DashboardPage() {
               className={st === 'error' ? 'border-danger/40' : ''}
             >
               <div className="flex items-start justify-between gap-3">
-                <Link href={`/printers/${p.id}`} className="block min-w-0">
+                <Link href={`/printers?focus=${encodeURIComponent(p.id)}`} className="block min-w-0">
                   <div className="truncate text-[16px] font-semibold text-textPrimary">
                     {printerLabelById.get(p.id) ?? p.displayName}
                   </div>

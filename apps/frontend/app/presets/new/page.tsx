@@ -9,8 +9,9 @@ import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { useAuth } from '../../auth/auth_context';
 import { apiRequest, tryParseApiErrorBody, type ApiError } from '../../lib/api';
-import type { PresetDto } from '../../lib/dto';
+import type { PresetDto, PrinterDto, PrintHistoryDto } from '../../lib/dto';
 import { buildPrinterLabelById } from '../../lib/printer_label';
+import { useWs } from '../../ws/ws_context';
 
 type FieldErrors = Record<string, string[]>;
 
@@ -26,24 +27,13 @@ function normalizeFieldErrors(raw: unknown): FieldErrors {
 
 export default function NewPresetPage() {
   const { token } = useAuth();
+  const ws = useWs();
   const [err, setErr] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
 
   const [models, setModels] = useState<Array<{ id: string; name: string }>>([]);
-  const [printers, setPrinters] = useState<
-    Array<{
-      id: string;
-      displayName: string;
-      modelId: string;
-      modelName: string;
-      bedX: number;
-      bedY: number;
-      nozzleDiameter: number;
-    }>
-  >([]);
-  const [history, setHistory] = useState<
-    Array<{ printerId: string; filename: string }>
-  >([]);
+  const [printers, setPrinters] = useState<PrinterDto[]>([]);
+  const [history, setHistory] = useState<PrintHistoryDto[]>([]);
 
   const [sourcePrinterId, setSourcePrinterId] = useState<string>('');
   const [sourceFilename, setSourceFilename] = useState<string>('');
@@ -56,63 +46,62 @@ export default function NewPresetPage() {
 
   const [allowedModelIds, setAllowedModelIds] = useState<string[]>([]);
 
-  const loadModels = async () => {
+  // Request initial data via WS
+  const requestData = () => {
     if (!token) return;
-    const res = await apiRequest<{
-      models: Array<{ id: string; name: string }>;
-    }>('/api/printer-models', { token });
-    setModels(res.models);
+    ws.send({
+      type: 'REQ_PRINTER_MODELS',
+      payload: { requestId: ws.nextRequestId() },
+    });
+    ws.send({
+      type: 'REQ_HISTORY',
+      payload: {
+        requestId: ws.nextRequestId(),
+        status: 'all',
+        limit: 200,
+        offset: 0,
+      },
+    });
   };
 
-  const loadHistory = async () => {
-    if (!token) return;
-    const res = await apiRequest<{
-      history: Array<{ printerId: string; filename: string }>;
-    }>('/api/history?limit=200', { token });
-    const items = Array.isArray(res.history) ? res.history : [];
-    setHistory(
-      items
-        .map((x) => ({
-          printerId: String(x.printerId),
-          filename: String(x.filename),
-        }))
-        .filter((x) =>
-          Boolean(x.printerId && x.filename && x.filename !== 'unknown'),
-        ),
-    );
-  };
-
-  const loadPrinters = async () => {
-    if (!token) return;
-    const res = await apiRequest<{
-      printers: Array<{
-        id: string;
-        displayName: string;
-        modelId: string;
-        modelName: string;
-        bedX: number;
-        bedY: number;
-        nozzleDiameter: number;
-      }>;
-    }>('/api/printers', { token });
-    setPrinters(
-      (res.printers ?? []).map((p) => ({
-        id: String(p.id),
-        displayName: String(p.displayName),
-        modelId: String((p as any).modelId ?? ''),
-        modelName: String((p as any).modelName ?? ''),
-        bedX: Number((p as any).bedX ?? 0),
-        bedY: Number((p as any).bedY ?? 0),
-        nozzleDiameter: Number((p as any).nozzleDiameter ?? 0),
-      })),
-    );
-  };
-
+  // Subscribe to WS events
   useEffect(() => {
-    void loadModels();
-    void loadHistory();
-    void loadPrinters();
-  }, [token]);
+    if (!token) return;
+
+    requestData();
+
+    return ws.subscribe((ev) => {
+      const e = ev as any;
+
+      if (e.type === 'PRINTERS_SNAPSHOT') {
+        const ps = e.payload?.printers as PrinterDto[] | undefined;
+        if (ps) setPrinters(ps);
+      }
+
+      if (e.type === 'PRINTER_STATUS') {
+        const p = e.payload?.printer as PrinterDto | undefined;
+        if (p) {
+          setPrinters((prev) => {
+            const idx = prev.findIndex((x) => x.id === p.id);
+            if (idx === -1) return [p, ...prev];
+            const copy = [...prev];
+            copy[idx] = p;
+            return copy;
+          });
+        }
+      }
+
+      if (e.type === 'PRINTER_MODELS_SNAPSHOT') {
+        const ms = e.payload?.models as Array<{ id: string; name: string }> | undefined;
+        if (ms) setModels(ms);
+      }
+
+      if (e.type === 'HISTORY_SNAPSHOT') {
+        const list = e.payload?.history as PrintHistoryDto[] | undefined;
+        if (list) setHistory(list);
+      }
+    });
+  }, [token, ws]);
 
   useEffect(() => {
     try {
@@ -198,7 +187,8 @@ export default function NewPresetPage() {
         method: 'POST',
         body: parsed.data,
       });
-      window.location.href = `/presets/${res.preset.id}`;
+      // Redirect with focus on new preset
+      window.location.href = `/presets?focus=${encodeURIComponent(res.preset.id)}`;
     } catch (e) {
       const ae = e as ApiError;
       const parsedBody = tryParseApiErrorBody(ae.bodyText);
@@ -389,13 +379,11 @@ export default function NewPresetPage() {
           </Card>
 
           <div className="mt-4 grid grid-cols-2 gap-2">
-            <Button
-              variant="secondary"
-              onClick={() => window.history.back()}
-              disabled={saving}
-            >
-              Cancel
-            </Button>
+            <Link href="/presets" className="block">
+              <Button className="w-full" variant="secondary" disabled={saving}>
+                Cancel
+              </Button>
+            </Link>
             <Button
               className="w-full"
               variant="primary"

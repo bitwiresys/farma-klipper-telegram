@@ -77,7 +77,7 @@ export default function NewPrinterPage() {
           },
         },
       );
-      window.location.href = `/printers/${res.printer.id}`;
+      window.location.href = `/printers?focus=${encodeURIComponent(res.printer.id)}&open=${encodeURIComponent(res.printer.id)}`;
     } catch (e) {
       const ae = e as ApiError;
       const parsed = tryParseApiErrorBody(ae.bodyText);

@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 
 import type { PrintHistoryDto, PrinterDto } from '../lib/dto';
@@ -301,11 +300,15 @@ export default function HistoryPage() {
                     </div>
                   )}
                 </div>
-                <Link href={`/printers/${active.printerId}`} className="block">
-                  <Button className="w-full" variant="secondary">
-                    Open printer
-                  </Button>
-                </Link>
+                <Button
+                  className="w-full"
+                  variant="secondary"
+                  onClick={() => {
+                    window.location.href = `/printers?open=${encodeURIComponent(active.printerId)}`;
+                  }}
+                >
+                  Open printer
+                </Button>
               </div>
             )}
           </BottomSheet>
