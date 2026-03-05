@@ -347,6 +347,12 @@ export class WsHub {
   }
 
   async handleClientMessage(client: Client, msg: WsClientMessage) {
+    // Handle heartbeat ping
+    if ((msg as any).type === 'PING') {
+      client.send(JSON.stringify({ type: 'PONG', payload: {} }));
+      return;
+    }
+
     if (msg.type === 'REQ_PRINTER_MODELS') {
       const models = await prisma.printerModel.findMany({
         orderBy: { name: 'asc' },

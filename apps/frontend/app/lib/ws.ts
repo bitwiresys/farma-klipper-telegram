@@ -5,6 +5,31 @@ export type WsEvent = {
   payload: unknown;
 };
 
+export type WsError = {
+  type: 'connection' | 'auth' | 'timeout' | 'unknown';
+  message: string;
+  timestamp: string;
+};
+
+type WsErrorListener = (err: WsError) => void;
+
+const wsErrorListeners = new Set<WsErrorListener>();
+
+export function subscribeWsErrors(fn: WsErrorListener): () => void {
+  wsErrorListeners.add(fn);
+  return () => wsErrorListeners.delete(fn);
+}
+
+function emitWsError(err: WsError) {
+  for (const fn of wsErrorListeners) {
+    try {
+      fn(err);
+    } catch {
+      // ignore
+    }
+  }
+}
+
 export function connectBackendWs(opts: {
   token: string;
   onEvent: (ev: WsEvent) => void;
@@ -16,6 +41,36 @@ export function connectBackendWs(opts: {
   let stopped = false;
   let ws: WebSocket | null = null;
   let attempt = 0;
+  let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+  let missedHeartbeats = 0;
+  const MAX_MISSED_HEARTBEATS = 3;
+
+  const clearHeartbeat = () => {
+    if (heartbeatTimer) {
+      clearInterval(heartbeatTimer);
+      heartbeatTimer = null;
+    }
+  };
+
+  const startHeartbeat = () => {
+    clearHeartbeat();
+    missedHeartbeats = 0;
+    heartbeatTimer = setInterval(() => {
+      if (!ws || ws.readyState !== WebSocket.OPEN) return;
+      missedHeartbeats++;
+      if (missedHeartbeats > MAX_MISSED_HEARTBEATS) {
+        emitWsError({
+          type: 'timeout',
+          message: 'WebSocket heartbeat timeout - reconnecting',
+          timestamp: new Date().toISOString(),
+        });
+        ws.close(1000, 'heartbeat timeout');
+        return;
+      }
+      // Send ping - server should respond with pong
+      ws.send(JSON.stringify({ type: 'PING' }));
+    }, 30000); // 30s heartbeat
+  };
 
   const connect = () => {
     if (stopped) return;
@@ -41,25 +96,41 @@ export function connectBackendWs(opts: {
     ws.onopen = () => {
       attempt = 0;
       opts.onStatus('open');
+      startHeartbeat();
     };
 
     ws.onmessage = (m) => {
       try {
         const parsed = JSON.parse(String(m.data)) as WsEvent;
+        // Reset heartbeat on any message
+        missedHeartbeats = 0;
+        // Handle pong
+        if (parsed.type === 'PONG') return;
         opts.onEvent(parsed);
       } catch {
         return;
       }
     };
 
-    ws.onerror = () => {
+    ws.onerror = (e) => {
       opts.onStatus('error');
+      emitWsError({
+        type: 'connection',
+        message: `WebSocket error: ${String(e)}`,
+        timestamp: new Date().toISOString(),
+      });
     };
 
-    ws.onclose = () => {
+    ws.onclose = (e) => {
+      clearHeartbeat();
       opts.onStatus('closed');
       if (stopped) return;
-      const delay = Math.min(30_000, Math.max(1, attempt) * 1000);
+      
+      // Exponential backoff with jitter
+      const baseDelay = Math.min(30000, Math.pow(2, Math.min(attempt, 5)) * 1000);
+      const jitter = Math.random() * 1000;
+      const delay = baseDelay + jitter;
+      
       setTimeout(connect, delay);
     };
   };
@@ -69,6 +140,7 @@ export function connectBackendWs(opts: {
   return {
     close: () => {
       stopped = true;
+      clearHeartbeat();
       try {
         ws?.close();
       } catch {
