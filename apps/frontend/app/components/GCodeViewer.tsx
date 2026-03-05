@@ -94,6 +94,31 @@ export function GCodeViewer({
     let disposed = false;
     const el = containerRef.current;
 
+    const onResize = () => {
+      const r = rendererRef.current;
+      if (!r) return;
+      const w = Math.max(10, el.clientWidth);
+      const h = Math.max(10, el.clientHeight);
+      try {
+        r.resize(w, h);
+      } catch {
+        // ignore
+      }
+      try {
+        (r as any).fitCamera?.();
+      } catch {
+        // ignore
+      }
+    };
+
+    const scheduleResize = () => {
+      // In Telegram/mini-app webviews layout can settle a bit later.
+      // Do a couple of deferred passes to ensure camera fits final size.
+      requestAnimationFrame(() => onResize());
+      setTimeout(() => onResize(), 50);
+      setTimeout(() => onResize(), 250);
+    };
+
     const load = async () => {
       setLoading(true);
       setError(null);
@@ -142,17 +167,7 @@ export function GCodeViewer({
         await r.render();
         if (disposed) return;
 
-        // Ensure correct sizing after Telegram viewport settles
-        try {
-          r.resize(Math.max(10, el.clientWidth), Math.max(10, el.clientHeight));
-        } catch {
-          // ignore
-        }
-        try {
-          (r as any).fitCamera?.();
-        } catch {
-          // ignore
-        }
+        scheduleResize();
 
         const defs = r.getLayerDefinitionsNoCopy?.() ?? r.getLayerDefinitions?.() ?? [];
         const lc = Array.isArray(defs) ? defs.length : 0;
@@ -172,31 +187,18 @@ export function GCodeViewer({
 
     load();
 
-    const onResize = () => {
-      const r = rendererRef.current;
-      if (!r) return;
-      const w = Math.max(10, el.clientWidth);
-      const h = Math.max(10, el.clientHeight);
-      try {
-        r.resize(w, h);
-      } catch {
-        // ignore
-      }
-      try {
-        (r as any).fitCamera?.();
-      } catch {
-        // ignore
-      }
-    };
-
     const ro = new ResizeObserver(() => onResize());
     ro.observe(el);
     window.addEventListener('resize', onResize);
+    window.visualViewport?.addEventListener('resize', onResize);
+    window.visualViewport?.addEventListener('scroll', onResize);
 
     return () => {
       disposed = true;
       ro.disconnect();
       window.removeEventListener('resize', onResize);
+      window.visualViewport?.removeEventListener('resize', onResize);
+      window.visualViewport?.removeEventListener('scroll', onResize);
     };
   }, [filename, lowPoly, printerId, token]);
 
@@ -229,8 +231,8 @@ export function GCodeViewer({
   const displayLayer = Math.min(simLayer, Math.max(0, total - 1));
 
   return (
-    <div className={`relative ${className}`}>
-      <div ref={containerRef} className="h-full w-full" />
+    <div className={`relative overflow-hidden ${className}`}>
+      <div ref={containerRef} className="absolute inset-0" />
 
       {loading && (
         <div className="absolute inset-0 flex items-center justify-center bg-bg/80">
