@@ -77,6 +77,49 @@ export async function registerPrintersRoutes(app: FastifyInstance) {
     });
   });
 
+  app.get('/api/printers/:id', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const p = await prisma.printer.findUnique({
+      where: { id },
+      include: { model: true },
+    });
+
+    if (!p) {
+      return reply.code(404).send({ error: 'PRINTER_NOT_FOUND' });
+    }
+
+    const snap = printerRuntime.getSnapshot(p.id);
+    const fn = String(snap.filename ?? '').trim();
+    const key = fn ? `${p.id}::${fn}` : '';
+
+    let jobLabel: string | null = null;
+    if (key) {
+      const deployment = await prisma.presetDeployment.findFirst({
+        where: { printerId: p.id, remoteFilename: fn },
+        include: { preset: { select: { title: true } } },
+      });
+      jobLabel = deployment?.preset.title ? `preset: ${deployment.preset.title}` : null;
+    }
+
+    return reply.send({
+      printer: {
+        id: p.id,
+        displayName: p.displayName,
+        modelId: p.modelId,
+        modelName: p.model.name,
+        bedX: p.bedX,
+        bedY: p.bedY,
+        bedZ: p.bedZ,
+        nozzleDiameter: p.nozzleDiameter,
+        needsRekey: (p as any).needsRekey ?? false,
+        snapshot: {
+          ...snap,
+          jobLabel,
+        },
+      },
+    });
+  });
+
   app.post('/api/printers', async (req, reply) => {
     const parsed = CreatePrinterSchema.safeParse(req.body);
     if (!parsed.success) {

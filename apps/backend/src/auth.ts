@@ -22,6 +22,7 @@ function isProtectedApiRoute(method: string, pathname: string): boolean {
   if (m === 'GET' && pathname === '/api/me') return true;
   if (m === 'GET' && pathname === '/api/snapshot') return true;
   if (m === 'GET' && pathname === '/api/printers') return true;
+  if (m === 'GET' && /^\/api\/printers\/[^/]+$/.test(pathname)) return true;
   if (m === 'POST' && pathname === '/api/printers') return true;
   if (m === 'GET' && pathname === '/api/printer-models') return true;
   if (m === 'POST' && pathname === '/api/printer-models') return true;
@@ -42,6 +43,14 @@ function isProtectedApiRoute(method: string, pathname: string): boolean {
   if (m === 'PATCH' && /^\/api\/printers\/[^/]+$/.test(pathname)) return true;
   if (m === 'DELETE' && /^\/api\/printers\/[^/]+$/.test(pathname)) return true;
   if (m === 'POST' && /^\/api\/printers\/[^/]+\/(test|rescan)$/.test(pathname))
+    return true;
+
+  if (m === 'POST' && /^\/api\/printers\/[^/]+\/(pause|resume|cancel)$/.test(pathname))
+    return true;
+
+  // G-code routes for 3D viewer
+  if (m === 'GET' && /^\/api\/gcode\/[^/]+$/.test(pathname)) return true;
+  if (m === 'GET' && /^\/api\/gcode\/[^/]+\/metadata$/.test(pathname))
     return true;
 
   if (m === 'POST' && /^\/api\/printers\/[^/]+\/emergency_stop$/.test(pathname))
