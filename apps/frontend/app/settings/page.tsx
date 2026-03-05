@@ -21,10 +21,14 @@ type NotificationsSettings = {
 type SecurityInfo = {
   user: {
     telegramId: string;
+    chatId?: string | null;
     firstName: string | null;
     lastName: string | null;
     username: string | null;
     isAllowed: boolean;
+  };
+  telegram?: {
+    botUsername?: string | null;
   };
   allowedTelegramUserIds: number[] | null;
 };
@@ -80,6 +84,14 @@ export default function SettingsPage() {
 
   const base = useMemo(() => getBackendBaseUrl(), []);
   const wsUrl = useMemo(() => getBackendWsUrl(), []);
+
+  const botLink = useMemo(() => {
+    const u = String(sec?.telegram?.botUsername ?? '')
+      .trim()
+      .replace(/^@+/, '');
+    if (!u) return null;
+    return `https://t.me/${u}`;
+  }, [sec]);
 
   const loadNotif = async () => {
     if (!token) return;
@@ -225,6 +237,36 @@ export default function SettingsPage() {
           <div className="mt-2 text-xs text-textMuted">
             No spam: each event once per print session.
           </div>
+
+          {sec?.user?.isAllowed && !sec?.user?.chatId && (
+            <div className="mt-3 rounded-card border border-warning/30 bg-warning/10 p-3 text-xs text-textPrimary">
+              <div className="font-medium">Action required</div>
+              <div className="mt-1 text-textSecondary">
+                Telegram doesn’t allow bots to message users until the user
+                opens a chat with the bot first. Open the bot and press /start
+                once.
+              </div>
+              <div className="mt-3">
+                {botLink ? (
+                  <a
+                    href={botLink}
+                    className="block"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    <Button className="w-full" variant="secondary">
+                      Open bot
+                    </Button>
+                  </a>
+                ) : (
+                  <div className="text-[11px] text-textMuted">
+                    Bot link is not configured. Set TELEGRAM_BOT_USERNAME in
+                    backend env (without @) to show a direct link.
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           <div className="mt-3 space-y-2">
             <div className="flex items-center justify-between rounded-btn border border-border/45 bg-surface2/55 p-3 text-xs shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">

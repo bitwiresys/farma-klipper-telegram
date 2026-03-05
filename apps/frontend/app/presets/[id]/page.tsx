@@ -94,6 +94,7 @@ export default function PresetDetailPage() {
 
   const [selectOpen, setSelectOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
   const [printing, setPrinting] = useState(false);
   const [results, setResults] = useState<PrintResultRow[] | null>(null);
 
@@ -298,7 +299,14 @@ export default function PresetDetailPage() {
       {token && preset && (
         <>
           <Card className="mt-3 p-3">
-            <div className="h-[200px] w-full overflow-hidden rounded-card bg-surface2">
+            <button
+              type="button"
+              className="h-[200px] w-full overflow-hidden rounded-card bg-surface2"
+              onClick={() => {
+                if (!preset.thumbnailUrl) return;
+                setPreviewOpen(true);
+              }}
+            >
               {preset.thumbnailUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
@@ -311,7 +319,7 @@ export default function PresetDetailPage() {
                   —
                 </div>
               )}
-            </div>
+            </button>
 
             <div className="mt-3 flex items-start justify-between gap-3">
               <div className="min-w-0">
@@ -588,6 +596,21 @@ export default function PresetDetailPage() {
               )}
             </div>
           </BottomSheet>
+
+          {previewOpen && preset.thumbnailUrl && (
+            <button
+              type="button"
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+              onClick={() => setPreviewOpen(false)}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={resolveThumbUrl(preset.thumbnailUrl)}
+                alt="preview"
+                className="max-h-[85vh] w-auto max-w-full rounded-card border border-border/60 bg-surface2 object-contain"
+              />
+            </button>
+          )}
         </>
       )}
     </>

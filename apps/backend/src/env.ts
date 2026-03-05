@@ -9,6 +9,7 @@ const schema = z.object({
 
   TELEGRAM_BOT_TOKEN: z.string().min(10),
   TELEGRAM_WEBAPP_URL: z.string().url(),
+  TELEGRAM_BOT_USERNAME: z.string().default(''),
   TELEGRAM_ALLOWED_USER_IDS: z.string().default(''),
   TELEGRAM_AUTH_MAX_AGE_SEC: z.coerce.number().int().positive().default(86400),
 

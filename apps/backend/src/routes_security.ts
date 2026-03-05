@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 
+import { env } from './env.js';
 import { getAllowedTelegramUserIds } from './env.js';
 import { prisma } from './prisma.js';
 
@@ -20,10 +21,14 @@ export async function registerSecurityRoutes(app: FastifyInstance) {
     return reply.send({
       user: {
         telegramId: user.telegramId,
+        chatId: user.chatId ?? null,
         firstName: user.firstName,
         lastName: user.lastName,
         username: user.username,
         isAllowed: user.isAllowed,
+      },
+      telegram: {
+        botUsername: env.TELEGRAM_BOT_USERNAME || null,
       },
       allowedTelegramUserIds:
         allowed.size === 0 ? null : Array.from(allowed.values()).sort(),
